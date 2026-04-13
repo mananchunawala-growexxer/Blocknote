@@ -1,0 +1,2 @@
+export const DEFAULT_DOCUMENT_TITLE = "Untitled";
+export const INITIAL_BLOCK_ORDER_INDEX = "1000.0000000000";
