@@ -1,4 +1,12 @@
-import type { AuthResponse, DocumentListResponse, DocumentResponse } from "@blocknote/shared";
+import type {
+  AuthResponse,
+  DocumentListResponse,
+  DocumentResponse,
+  BlockListResponse,
+  BlockResponse,
+  BlockDto,
+} from "@blocknote/shared";
+import type { BlockType } from "@blocknote/shared";
 import { sessionStore } from "../stores/session";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
@@ -63,6 +71,43 @@ export async function renameDocument(input: { id: string; title: string }) {
 
 export async function deleteDocument(id: string) {
   return request<void>(`/documents/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// ==================== BLOCK ENDPOINTS ====================
+
+export async function getDocumentBlocks(documentId: string): Promise<BlockListResponse> {
+  return request<BlockListResponse>(`/blocks/documents/${documentId}/blocks`);
+}
+
+export async function createBlock(input: {
+  documentId: string;
+  type: BlockType;
+  content?: Record<string, unknown>;
+}): Promise<BlockResponse> {
+  return request<BlockResponse>("/blocks", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateBlock(input: {
+  blockId: string;
+  type?: BlockType;
+  content?: Record<string, unknown>;
+}): Promise<BlockResponse> {
+  return request<BlockResponse>(`/blocks/${input.blockId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      type: input.type,
+      content: input.content,
+    }),
+  });
+}
+
+export async function deleteBlock(blockId: string): Promise<void> {
+  return request<void>(`/blocks/${blockId}`, {
     method: "DELETE",
   });
 }

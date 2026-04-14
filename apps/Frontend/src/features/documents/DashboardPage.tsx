@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createDocument, deleteDocument, getDocuments, renameDocument } from "../../lib/api";
 import { sessionStore, useSession } from "../../stores/session";
@@ -8,6 +9,7 @@ function formatDate(value: string) {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useSession((state) => state.user);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,14 +44,14 @@ export function DashboardPage() {
   });
 
   return (
-    <main className="dashboard-layout">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">Authenticated workspace</p>
-          <h1>Your documents</h1>
+    <main className="workspace-layout">
+      <aside className="workspace-sidebar">
+        <div className="brand">BlockNote</div>
+        <div className="workspace-user">
+          <p className="eyebrow">Signed in</p>
           <p className="copy">{user?.email}</p>
         </div>
-        <div className="dashboard-actions">
+        <div className="workspace-actions">
           <button onClick={() => createMutation.mutate()} type="button">
             New document
           </button>
@@ -63,59 +65,84 @@ export function DashboardPage() {
             Logout
           </button>
         </div>
-      </header>
+      </aside>
 
-      <section className="documents-panel">
-        {documentsQuery.isLoading ? <p>Loading documents...</p> : null}
-        {documentsQuery.error ? <p className="error-text">{documentsQuery.error.message}</p> : null}
-        {documentsQuery.data?.items.length === 0 ? <p>No documents yet. Create your first one.</p> : null}
-        <ul className="document-list">
-          {documentsQuery.data?.items.map((document) => (
-            <li key={document.id}>
-              <div>
-                {editingId === document.id ? (
-                  <form
-                    className="inline-title-form"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      renameMutation.mutate({ id: document.id, title: draftTitle });
+      <section className="workspace-main">
+        <header className="workspace-main-header">
+          <div>
+            <p className="eyebrow">Documents</p>
+            <h1>Your writing workspace</h1>
+            <p className="copy">Organize notes, drafts, and project docs in one place.</p>
+          </div>
+        </header>
+
+        <section className="documents-panel">
+          {documentsQuery.isLoading ? <p>Loading documents...</p> : null}
+          {documentsQuery.error ? <p className="error-text">{documentsQuery.error.message}</p> : null}
+          {documentsQuery.data?.items.length === 0 ? <p>No documents yet. Create your first one.</p> : null}
+          <ul className="document-list">
+            {documentsQuery.data?.items.map((document) => (
+              <li key={document.id}>
+                <div>
+                  {editingId === document.id ? (
+                    <form
+                      className="inline-title-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        renameMutation.mutate({ id: document.id, title: draftTitle });
+                      }}
+                    >
+                      <input
+                        value={draftTitle}
+                        onChange={(event) => setDraftTitle(event.target.value)}
+                        aria-label="Document title"
+                      />
+                      <button type="submit">Save</button>
+                    </form>
+                  ) : (
+                    <div>
+                      <strong
+                        className="document-title"
+                        onClick={() => navigate(`/documents/${document.id}`)}
+                        title="Click to open document"
+                      >
+                        {document.title}
+                      </strong>
+                      <p>Updated {formatDate(document.updatedAt)}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="document-row-actions">
+                  <span className="document-id">{document.id.slice(0, 8)}</span>
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      setEditingId(document.id);
+                      setDraftTitle(document.title);
                     }}
+                    type="button"
                   >
-                    <input
-                      value={draftTitle}
-                      onChange={(event) => setDraftTitle(event.target.value)}
-                      aria-label="Document title"
-                    />
-                    <button type="submit">Save</button>
-                  </form>
-                ) : (
-                  <strong>{document.title}</strong>
-                )}
-                <p>Updated {formatDate(document.updatedAt)}</p>
-              </div>
-              <div className="document-row-actions">
-                <span>{document.id.slice(0, 8)}</span>
-                <button
-                  className="secondary"
-                  onClick={() => {
-                    setEditingId(document.id);
-                    setDraftTitle(document.title);
-                  }}
-                  type="button"
-                >
-                  Rename
-                </button>
-                <button
-                  className="danger"
-                  onClick={() => deleteMutation.mutate(document.id)}
-                  type="button"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                    Rename
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => navigate(`/documents/${document.id}`)}
+                    type="button"
+                  >
+                    Open
+                  </button>
+                  <button
+                    className="danger"
+                    onClick={() => deleteMutation.mutate(document.id)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
       </section>
     </main>
   );
