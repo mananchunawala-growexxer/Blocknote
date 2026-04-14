@@ -2,12 +2,18 @@ import type {
   AuthResponse,
   DocumentListResponse,
   DocumentResponse,
-  BlockListResponse,
-  BlockResponse,
   BlockDto,
 } from "@blocknote/shared";
 import type { BlockType } from "@blocknote/shared";
 import { sessionStore } from "../stores/session";
+
+export interface BlockListResponse {
+  blocks: BlockDto[];
+}
+
+export interface BlockResponse {
+  block: BlockDto;
+}
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 

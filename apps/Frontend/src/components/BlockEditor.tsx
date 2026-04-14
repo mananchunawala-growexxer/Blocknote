@@ -93,7 +93,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ documentId }) => {
    */
   const handleEnter = useCallback(
     async (blockId: string, cursorPosition: number) => {
-      const block = blocks.find((b) => b.id === blockId);
+      const block = blocks.find((b: BlockDto) => b.id === blockId);
       if (!block) return;
 
       const text = (block.content.text as string) ?? "";
@@ -165,7 +165,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ documentId }) => {
    */
   const handleBackspace = useCallback(
     async (blockId: string) => {
-      const blockIndex = blocks.findIndex((b) => b.id === blockId);
+      const blockIndex = blocks.findIndex((b: BlockDto) => b.id === blockId);
       if (blockIndex <= 0) return; // First block or not found
 
       const currentBlock = blocks[blockIndex];
@@ -254,7 +254,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ documentId }) => {
    */
   const handleContentChange = useCallback(
     (blockId: string, contentPatch: Record<string, unknown>) => {
-      const block = blocks.find((b) => b.id === blockId);
+      const block = blocks.find((b: BlockDto) => b.id === blockId);
       const mergedContent: Record<string, unknown> = {
         ...(block?.content ?? {}),
         ...contentPatch,
@@ -332,7 +332,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ documentId }) => {
 
   const handleDeleteBlock = useCallback(
     async (blockId: string) => {
-      const blockIndex = blocks.findIndex((b) => b.id === blockId);
+      const blockIndex = blocks.findIndex((b: BlockDto) => b.id === blockId);
       if (blockIndex === -1) return;
 
       if (blocks.length === 1) {
@@ -359,7 +359,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ documentId }) => {
    */
   const handleChangeBlockType = useCallback(
     async (blockId: string, newType: BlockType) => {
-      const block = blocks.find((b) => b.id === blockId);
+      const block = blocks.find((b: BlockDto) => b.id === blockId);
       if (!block) return;
 
       // Reset slash menu
@@ -425,7 +425,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ documentId }) => {
   return (
     <div className="block-editor">
       <div className="blocks-container">
-        {blocks.map((block, index) => (
+        {blocks.map((block: BlockDto) => (
           <Block
             key={block.id}
             block={block}
