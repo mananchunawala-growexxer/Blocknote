@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { createBlockForUser, deleteBlockForUser, getDocumentBlocks, updateBlockForUser } from "./blocks.service.js";
+import { createBlockForUser, deleteBlockForUser, getDocumentBlocks, reorderBlockForUser, updateBlockForUser } from "./blocks.service.js";
 import type { BlockType } from "@blocknote/shared";
 
 function getRouteId(value: string | string[] | undefined): string {
@@ -39,6 +39,23 @@ export async function updateBlockController(req: Request, res: Response): Promis
     type: type as BlockType | undefined,
     content,
   });
+  res.status(200).json({ block });
+}
+
+/**
+ * PATCH /api/blocks/:blockId/reorder
+ * Move a block between surrounding order_index values
+ * Body: { afterOrderIndex, beforeOrderIndex? }
+ */
+export async function reorderBlockController(req: Request, res: Response): Promise<void> {
+  const blockId = getRouteId(req.params.blockId);
+  const { afterOrderIndex, beforeOrderIndex } = req.body ?? {};
+  const block = await reorderBlockForUser(
+    req.auth!.id,
+    blockId,
+    String(afterOrderIndex ?? "0"),
+    beforeOrderIndex ? String(beforeOrderIndex) : undefined,
+  );
   res.status(200).json({ block });
 }
 

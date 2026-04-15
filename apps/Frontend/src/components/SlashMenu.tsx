@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import type { BlockType } from "@blocknote/shared";
-import { BLOCK_TYPES } from "@blocknote/shared";
 
 interface SlashMenuProps {
   blockId: string;
@@ -9,14 +8,14 @@ interface SlashMenuProps {
   onClose: (clearText?: boolean) => void;
 }
 
-const BLOCK_MENU_ITEMS: Array<{ type: BlockType; label: string; description: string }> = [
-  { type: "paragraph", label: "Paragraph", description: "Start typing" },
-  { type: "heading_1", label: "Heading 1", description: "Large title" },
-  { type: "heading_2", label: "Heading 2", description: "Medium title" },
-  { type: "todo", label: "To-do", description: "Checkbox with text" },
-  { type: "code", label: "Code", description: "Monospace text" },
-  { type: "divider", label: "Divider", description: "Horizontal line" },
-  { type: "image", label: "Image", description: "Embed image from URL" },
+const BLOCK_MENU_ITEMS: Array<{ type: BlockType; label: string; description: string; icon: string }> = [
+  { type: "paragraph", label: "Paragraph", description: "Start typing", icon: "¶" },
+  { type: "heading_1", label: "Heading 1", description: "Large title", icon: "H1" },
+  { type: "heading_2", label: "Heading 2", description: "Medium title", icon: "H2" },
+  { type: "todo", label: "To-do", description: "Checkbox with text", icon: "☑" },
+  { type: "code", label: "Code", description: "Monospace text", icon: "<>" },
+  { type: "divider", label: "Divider", description: "Horizontal line", icon: "─" },
+  { type: "image", label: "Image", description: "Embed image from URL", icon: "▣" },
 ];
 
 /**
@@ -47,12 +46,14 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ blockId, position, onSelec
       }
 
       if (e.key === "ArrowDown") {
+        if (filteredItems.length === 0) return;
         e.preventDefault();
         setSelectedIndex((prev) => (prev + 1) % filteredItems.length);
         return;
       }
 
       if (e.key === "ArrowUp") {
+        if (filteredItems.length === 0) return;
         e.preventDefault();
         setSelectedIndex((prev) => (prev - 1 + filteredItems.length) % filteredItems.length);
         return;
@@ -107,7 +108,7 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ blockId, position, onSelec
       }}
     >
       <div className="slash-menu-header">
-        <span>Searching: /{query}</span>
+        <span>/ {query || "commands"}</span>
       </div>
 
       {filteredItems.length === 0 ? (
@@ -120,8 +121,13 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ blockId, position, onSelec
               className={`slash-menu-item ${index === selectedIndex ? "selected" : ""}`}
               onClick={() => onSelectType(item.type)}
             >
-              <div className="slash-menu-item-label">{item.label}</div>
-              <div className="slash-menu-item-description">{item.description}</div>
+              <span className="slash-menu-item-icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <div className="slash-menu-item-copy">
+                <div className="slash-menu-item-label">{item.label}</div>
+                <div className="slash-menu-item-description">{item.description}</div>
+              </div>
             </li>
           ))}
         </ul>

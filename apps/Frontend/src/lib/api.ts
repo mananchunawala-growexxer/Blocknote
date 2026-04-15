@@ -1,5 +1,6 @@
 import type {
   AuthResponse,
+  DocumentShareResponse,
   DocumentListResponse,
   DocumentDetailResponse,
   DocumentResponse,
@@ -111,6 +112,21 @@ export async function deleteDocument(id: string) {
   });
 }
 
+export async function getDocumentDetail(documentId: string): Promise<DocumentDetailResponse> {
+  return request<DocumentDetailResponse>(`/documents/${documentId}`);
+}
+
+export async function getSharedDocumentDetail(shareToken: string): Promise<DocumentDetailResponse> {
+  return request<DocumentDetailResponse>(`/documents/shared/${shareToken}`);
+}
+
+export async function updateDocumentShare(input: { id: string; isPublic: boolean }): Promise<DocumentShareResponse> {
+  return request<DocumentShareResponse>(`/documents/${input.id}/share`, {
+    method: "PATCH",
+    body: JSON.stringify({ isPublic: input.isPublic }),
+  });
+}
+
 // ==================== BLOCK ENDPOINTS ====================
 
 export async function getDocumentBlocks(documentId: string): Promise<BlockListResponse> {
@@ -147,6 +163,20 @@ export async function updateBlock(input: {
     body: JSON.stringify({
       type: input.type,
       content: input.content,
+    }),
+  });
+}
+
+export async function reorderBlock(input: {
+  blockId: string;
+  afterOrderIndex: string;
+  beforeOrderIndex?: string;
+}): Promise<BlockResponse> {
+  return request<BlockResponse>(`/blocks/${input.blockId}/reorder`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      afterOrderIndex: input.afterOrderIndex,
+      beforeOrderIndex: input.beforeOrderIndex,
     }),
   });
 }

@@ -1,33 +1,51 @@
 import {
   ERROR_CODES,
   createDocumentSchema,
+  type DocumentShareResponse,
   type DocumentDetailResponse,
   type DocumentListResponse,
   updateDocumentSchema,
+  updateDocumentShareSchema,
 } from "@blocknote/shared";
 import { DEFAULT_DOCUMENT_TITLE, INITIAL_BLOCK_ORDER_INDEX } from "../../constants/documents.js";
 import { pool } from "../../lib/db.js";
 import { ApiError } from "../../lib/api-error.js";
+import { generateToken } from "../../lib/crypto.js";
 import {
   createBlock,
   createDocument,
   deleteDocument,
+  findDocumentByShareTokenHash,
   findDocumentByIdForUser,
   listBlocksByDocumentId,
   listDocumentsByUserId,
+  updateDocumentShareSettings,
   updateDocumentTitle,
 } from "./documents.repository.js";
+
+function mapDocumentSummary(document: {
+  id: string;
+  title: string;
+  updated_at: Date;
+  created_at: Date;
+  is_public: boolean;
+}, shareToken: string | null = null) {
+  return {
+    id: document.id,
+    title: document.title,
+    updatedAt: document.updated_at.toISOString(),
+    createdAt: document.created_at.toISOString(),
+    isPublic: document.is_public,
+    shareToken,
+    shareUrl: shareToken ? `/shared/${shareToken}` : null,
+  };
+}
 
 export async function listDocuments(userId: string): Promise<DocumentListResponse> {
   const documents = await listDocumentsByUserId(userId);
 
   return {
-    items: documents.map((document) => ({
-      id: document.id,
-      title: document.title,
-      updatedAt: document.updated_at.toISOString(),
-      createdAt: document.created_at.toISOString(),
-    })),
+    items: documents.map((document) => mapDocumentSummary(document, document.is_public ? document.share_token_hash : null)),
   };
 }
 
@@ -53,12 +71,7 @@ export async function createDocumentWithInitialBlock(userId: string, title: stri
     );
     await client.query("commit");
 
-    return {
-      id: document.id,
-      title: document.title,
-      updatedAt: document.updated_at.toISOString(),
-      createdAt: document.created_at.toISOString(),
-    };
+    return mapDocumentSummary(document);
   } catch (error) {
     await client.query("rollback");
     throw error;
@@ -76,10 +89,7 @@ export async function renameDocumentForUser(userId: string, documentId: string, 
   }
 
   return {
-    id: document.id,
-    title: document.title,
-    updatedAt: document.updated_at.toISOString(),
-    createdAt: document.created_at.toISOString(),
+    ...mapDocumentSummary(document),
   };
 }
 
@@ -102,12 +112,12 @@ export async function getDocumentDetailForUser(userId: string, documentId: strin
 
   return {
     document: {
-      id: document.id,
-      title: document.title,
-      updatedAt: document.updated_at.toISOString(),
-      createdAt: document.created_at.toISOString(),
+      ...mapDocumentSummary(document, document.is_public ? document.share_token_hash : null),
       currentVersion: document.current_version,
       isPublic: document.is_public,
+      shareToken: document.is_public ? document.share_token_hash : null,
+      shareUrl: document.is_public && document.share_token_hash ? `/shared/${document.share_token_hash}` : null,
+      viewerRole: "owner",
     },
     blocks: blocks.map((block) => ({
       id: block.id,
@@ -119,5 +129,66 @@ export async function getDocumentDetailForUser(userId: string, documentId: strin
       createdAt: block.created_at.toISOString(),
       updatedAt: block.updated_at.toISOString(),
     })),
+  };
+}
+
+export async function getSharedDocumentDetail(shareToken: string): Promise<DocumentDetailResponse> {
+  const token = shareToken.trim();
+  if (!token) {
+    throw new ApiError(404, ERROR_CODES.DOCUMENT_NOT_FOUND, "Shared document not found");
+  }
+
+  const document = await findDocumentByShareTokenHash(token);
+  if (!document) {
+    throw new ApiError(404, ERROR_CODES.DOCUMENT_NOT_FOUND, "Shared document not found");
+  }
+
+  const blocks = await listBlocksByDocumentId(document.id);
+
+  return {
+    document: {
+      ...mapDocumentSummary(document, token),
+      currentVersion: document.current_version,
+      isPublic: document.is_public,
+      shareToken: token,
+      shareUrl: `/shared/${token}`,
+      viewerRole: "shared_reader",
+    },
+    blocks: blocks.map((block) => ({
+      id: block.id,
+      documentId: block.document_id,
+      parentId: block.parent_id,
+      type: block.type,
+      content: block.content_json,
+      orderIndex: block.order_index,
+      createdAt: block.created_at.toISOString(),
+      updatedAt: block.updated_at.toISOString(),
+    })),
+  };
+}
+
+export async function updateDocumentShareForUser(
+  userId: string,
+  documentId: string,
+  input: { isPublic: boolean },
+): Promise<DocumentShareResponse> {
+  const parsed = updateDocumentShareSchema.parse(input);
+  const shareToken = parsed.isPublic ? generateToken() : null;
+  const document = await updateDocumentShareSettings(documentId, userId, {
+    isPublic: parsed.isPublic,
+    shareTokenHash: shareToken,
+  });
+
+  if (!document) {
+    throw new ApiError(403, ERROR_CODES.DOCUMENT_FORBIDDEN, "You do not have access to this document");
+  }
+
+  return {
+    document: {
+      id: document.id,
+      isPublic: document.is_public,
+      shareToken,
+      shareUrl: shareToken ? `/shared/${shareToken}` : null,
+    },
   };
 }

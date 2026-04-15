@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { BrandLogo } from "../../components/BrandLogo";
 import { login, register } from "../../lib/api";
 import { sessionStore } from "../../stores/session";
 
@@ -36,6 +37,7 @@ export function AuthPage() {
     <main className="auth-layout">
       <section className="auth-card">
         <aside className="auth-showcase">
+          <BrandLogo />
           <p className="eyebrow">Modern document editing</p>
           <h1>Write like Notion. Ship like BlockNote.</h1>
           <p className="copy">
@@ -52,6 +54,12 @@ export function AuthPage() {
           <p className="eyebrow">Your workspace</p>
           <h2>{mode === "login" ? "Welcome back" : "Create account"}</h2>
           <p className="copy">Use your credentials to continue.</p>
+
+          <div className="auth-nav-links">
+            <button className="secondary" type="button" onClick={() => navigate("/")}>
+              ← Back to Home
+            </button>
+          </div>
 
           <div className="mode-switch">
             <button

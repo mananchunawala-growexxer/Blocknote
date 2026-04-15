@@ -79,6 +79,17 @@ export async function findDocumentByIdForUser(documentId: string, userId: string
   return result.rows[0] ?? null;
 }
 
+export async function findDocumentByShareTokenHash(shareTokenHash: string): Promise<DocumentRecord | null> {
+  const result = await pool.query<DocumentRecord>(
+    `select id, user_id, title, is_public, share_token_hash, current_version, created_at, updated_at
+     from documents
+     where is_public = true and share_token_hash = $1`,
+    [shareTokenHash],
+  );
+
+  return result.rows[0] ?? null;
+}
+
 export async function listBlocksByDocumentId(documentId: string): Promise<BlockRecord[]> {
   const result = await pool.query<BlockRecord>(
     `select id, document_id, parent_id, type, content_json, order_index, created_at, updated_at
@@ -105,6 +116,34 @@ export async function updateDocumentTitle(
   );
 
   return result.rows[0] ?? null;
+}
+
+export async function updateDocumentShareSettings(
+  documentId: string,
+  userId: string,
+  input: {
+    isPublic: boolean;
+    shareTokenHash: string | null;
+  },
+): Promise<DocumentRecord | null> {
+  const result = await pool.query<DocumentRecord>(
+    `update documents
+     set is_public = $3, share_token_hash = $4, updated_at = now()
+     where id = $1 and user_id = $2
+     returning id, user_id, title, is_public, share_token_hash, current_version, created_at, updated_at`,
+    [documentId, userId, input.isPublic, input.shareTokenHash],
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function touchDocumentById(documentId: string): Promise<void> {
+  await pool.query(
+    `update documents
+     set updated_at = now()
+     where id = $1`,
+    [documentId],
+  );
 }
 
 export async function deleteDocument(documentId: string, userId: string): Promise<boolean> {

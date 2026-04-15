@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useLocation } from "react-router-dom";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { AuthPage } from "../features/auth/AuthPage";
 import { DashboardPage } from "../features/documents/DashboardPage";
 import { EditorPage } from "../features/editor/EditorPage";
@@ -20,10 +21,12 @@ export function App() {
   const location = useLocation();
 
   return (
-    <div key={location.pathname} className="route-transition">
+    <div key={location.pathname} className="route-transition app-shell">
+      <ThemeToggle />
       <Routes location={location}>
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/documents/:documentId" element={<ProtectedEditorRoute />} />
+        <Route path="/shared/:shareToken" element={<EditorPage />} />
         <Route path="/" element={<HomeRoute />} />
       </Routes>
     </div>

@@ -1,6 +1,6 @@
 import { ERROR_CODES, BLOCK_TYPES, type BlockType } from "@blocknote/shared";
 import { ApiError } from "../../lib/api-error.js";
-import { findDocumentByIdForUser, listBlocksByDocumentId, createBlock } from "../documents/documents.repository.js";
+import { findDocumentByIdForUser, listBlocksByDocumentId, createBlock, touchDocumentById } from "../documents/documents.repository.js";
 import {
   getBlockByIdWithOwnership,
   updateBlock,
@@ -102,6 +102,8 @@ export async function createBlockForUser(
     },
   );
 
+  await touchDocumentById(documentId);
+
   return mapBlockRecord(block);
 }
 
@@ -136,6 +138,8 @@ export async function updateBlockForUser(
     throw new ApiError(403, ERROR_CODES.BLOCK_FORBIDDEN, "Could not update block");
   }
 
+  await touchDocumentById(block.document_id);
+
   return mapBlockRecord(updated);
 }
 
@@ -153,6 +157,8 @@ export async function deleteBlockForUser(userId: string, blockId: string) {
   if (!deleted) {
     throw new ApiError(403, ERROR_CODES.BLOCK_FORBIDDEN, "Could not delete block");
   }
+
+  await touchDocumentById(block.document_id);
 }
 
 /**
@@ -179,6 +185,8 @@ export async function reorderBlockForUser(
   if (!updated) {
     throw new ApiError(403, ERROR_CODES.BLOCK_FORBIDDEN, "Could not reorder block");
   }
+
+  await touchDocumentById(block.document_id);
 
   return mapBlockRecord(updated);
 }

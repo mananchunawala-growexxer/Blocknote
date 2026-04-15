@@ -4,6 +4,7 @@ import {
   createBlockController,
   deleteBlockController,
   listBlocksController,
+  reorderBlockController,
   updateBlockController,
 } from "./blocks.controller.js";
 
@@ -20,6 +21,9 @@ blocksRouter.post("/", createBlockController);
 
 // Update a block
 blocksRouter.patch("/:blockId", updateBlockController);
+
+// Reorder a block
+blocksRouter.patch("/:blockId/reorder", reorderBlockController);
 
 // Delete a block
 blocksRouter.delete("/:blockId", deleteBlockController);

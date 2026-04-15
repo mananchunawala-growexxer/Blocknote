@@ -6,17 +6,32 @@ import {
   getBlockText,
 } from "../utils/blockUtils";
 
+const CODE_LANGUAGES = [
+  { id: "javascript", label: "JavaScript" },
+  { id: "typescript", label: "TypeScript" },
+  { id: "python", label: "Python" },
+  { id: "java", label: "Java" },
+] as const;
+
 interface BlockProps {
   block: BlockDto;
   isSelected: boolean;
+  isBeingDragged?: boolean;
+  isMultiSelected?: boolean;
+  readOnly?: boolean;
   isSlashMenuOpen?: boolean;
   onSelect: (blockId: string) => void;
+  onToggleMultiSelect?: (blockId: string) => void;
   onContentChange: (blockId: string, contentPatch: Record<string, unknown>) => void;
   onEnter: (blockId: string, cursorPosition: number) => void;
   onBackspace: (blockId: string, cursorPosition: number) => void;
+  onVerticalNavigate?: (blockId: string, direction: "up" | "down", cursorPosition: number) => void;
+  onDuplicate?: (blockId: string) => void;
   onTab?: (blockId: string, shiftKey: boolean) => void;
   onSlash: (blockId: string) => void;
-  onDelete: (blockId: string) => void;
+  onAddAfter?: (blockId: string) => void;
+  onDragStart?: (blockId: string, event: React.DragEvent<HTMLElement>) => void;
+  onDragEnd?: (event: React.DragEvent<HTMLElement>) => void;
 }
 
 /**
@@ -27,14 +42,22 @@ interface BlockProps {
 export const Block: React.FC<BlockProps> = ({
   block,
   isSelected,
+  isBeingDragged = false,
+  isMultiSelected = false,
+  readOnly = false,
   isSlashMenuOpen = false,
   onSelect,
+  onToggleMultiSelect,
   onContentChange,
   onEnter,
   onBackspace,
+  onVerticalNavigate,
+  onDuplicate,
   onTab,
   onSlash,
-  onDelete,
+  onAddAfter,
+  onDragStart,
+  onDragEnd,
 }) => {
   const contentRef = useRef<any>(null);
   const [savedCursorPos, setSavedCursorPos] = useState(0);
@@ -43,6 +66,33 @@ export const Block: React.FC<BlockProps> = ({
     top: number;
     left: number;
   }>({ visible: false, top: 0, left: 0 });
+  const [showImageUrlInput, setShowImageUrlInput] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState<string | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const copyResetTimer = useRef<number | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimer.current !== null) {
+        window.clearTimeout(copyResetTimer.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isActionMenuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsActionMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handlePointerDown);
+    return () => window.removeEventListener("mousedown", handlePointerDown);
+  }, [isActionMenuOpen]);
 
   // Restore cursor position when block becomes selected
   useEffect(() => {
@@ -71,8 +121,49 @@ export const Block: React.FC<BlockProps> = ({
     }
   }, [block.id, block.content]);
 
+  useEffect(() => {
+    if (block.type !== "image") {
+      setShowImageUrlInput(false);
+      setImageLoadError(null);
+      return;
+    }
+
+    const url = ((block.content.url as string) ?? "").trim();
+    if (!url) {
+      setShowImageUrlInput(true);
+      setImageLoadError(null);
+    }
+  }, [block.id, block.type, block.content.url]);
+
+  const isValidImageUrl = (value: string): boolean => {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  };
+
+  const handleCopyCode = async () => {
+    const codeText = ((block.content.text as string) ?? "").trim();
+    if (!codeText) return;
+
+    try {
+      await navigator.clipboard.writeText(codeText);
+      setCodeCopied(true);
+      if (copyResetTimer.current !== null) {
+        window.clearTimeout(copyResetTimer.current);
+      }
+      copyResetTimer.current = window.setTimeout(() => {
+        setCodeCopied(false);
+      }, 1500);
+    } catch {
+      // no-op: clipboard access can fail in restricted contexts
+    }
+  };
+
   const syncContentFromDom = () => {
-    if (!contentRef.current) return;
+    if (readOnly || !contentRef.current) return;
 
     onContentChange(block.id, {
       text: getBlockText(contentRef.current),
@@ -103,7 +194,7 @@ export const Block: React.FC<BlockProps> = ({
     selection.addRange(after);
   };
 
-  const wrapSelectionInTag = (tagName: "strong" | "em" | "code", placeholder: string) => {
+  const wrapSelectionInTag = (tagName: "strong" | "em" | "u" | "s" | "code", placeholder: string) => {
     if (!contentRef.current) return;
 
     const selectionInfo = getEditorSelectionRange();
@@ -209,6 +300,10 @@ export const Block: React.FC<BlockProps> = ({
   }, [block.type, isSelected, isSlashMenuOpen]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (readOnly) {
+      return;
+    }
+
     const currentPosition = getCursorPosition(contentRef.current);
 
     if (isSlashMenuOpen) {
@@ -235,6 +330,18 @@ export const Block: React.FC<BlockProps> = ({
       return;
     }
 
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "u") {
+      e.preventDefault();
+      wrapSelectionInTag("u", "underline");
+      return;
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "x") {
+      e.preventDefault();
+      wrapSelectionInTag("s", "strike");
+      return;
+    }
+
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") {
       e.preventDefault();
       applyLinkFormat();
@@ -255,6 +362,21 @@ export const Block: React.FC<BlockProps> = ({
         onBackspace(block.id, currentPosition);
       }
       return;
+    }
+
+    if (e.key === "ArrowUp" && currentPosition === 0) {
+      e.preventDefault();
+      onVerticalNavigate?.(block.id, "up", currentPosition);
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      const text = getBlockText(contentRef.current);
+      if (currentPosition >= text.length) {
+        e.preventDefault();
+        onVerticalNavigate?.(block.id, "down", currentPosition);
+        return;
+      }
     }
 
     // Tab: indent/outdent (if handler provided)
@@ -279,7 +401,7 @@ export const Block: React.FC<BlockProps> = ({
   };
 
   const handleInput = () => {
-    if (!contentRef.current) return;
+    if (readOnly || !contentRef.current) return;
     onContentChange(block.id, {
       text: getBlockText(contentRef.current),
       html: contentRef.current.innerHTML,
@@ -294,6 +416,32 @@ export const Block: React.FC<BlockProps> = ({
 
   const handleClick = () => {
     onSelect(block.id);
+    if (readOnly || !contentRef.current) return;
+
+    const editable = contentRef.current as HTMLElement;
+    requestAnimationFrame(() => {
+      if (document.activeElement !== editable) {
+        editable.focus();
+        const textLength = getBlockText(editable).length;
+        setCursorPosition(editable, textLength);
+      }
+    });
+  };
+
+  const handleAddBlock = () => {
+    if (readOnly) return;
+    onSelect(block.id);
+    onAddAfter?.(block.id);
+  };
+
+  const handleBlockDragStart = (event: React.DragEvent<HTMLButtonElement>) => {
+    if (readOnly) return;
+    onSelect(block.id);
+    onDragStart?.(block.id, event);
+  };
+
+  const handleBlockDragEnd = (event: React.DragEvent<HTMLButtonElement>) => {
+    onDragEnd?.(event);
   };
 
   // Render block based on type
@@ -310,7 +458,7 @@ export const Block: React.FC<BlockProps> = ({
         return (
           <h1
             ref={contentRef}
-            contentEditable
+            contentEditable={!readOnly}
             suppressContentEditableWarning
             className="block-content heading-1"
             data-placeholder="Heading 1"
@@ -322,7 +470,7 @@ export const Block: React.FC<BlockProps> = ({
         return (
           <h2
             ref={contentRef}
-            contentEditable
+            contentEditable={!readOnly}
             suppressContentEditableWarning
             className="block-content heading-2"
             data-placeholder="Heading 2"
@@ -330,61 +478,164 @@ export const Block: React.FC<BlockProps> = ({
           />
         );
 
-      case "code":
+      case "code": {
+        const selectedLanguage = typeof block.content.language === "string"
+          ? block.content.language
+          : "javascript";
+
         return (
-          <pre
-            ref={contentRef}
-            contentEditable
-            suppressContentEditableWarning
-            className="block-content code"
-            spellCheck="false"
-            data-placeholder="Write code..."
-            onKeyDown={(e) => {
-              // Handle Tab in code blocks
-              if (e.key === "Tab") {
-                e.preventDefault();
-                const position = getCursorPosition(contentRef.current);
-                const text = getBlockText(contentRef.current);
-                const newText = text.slice(0, position) + "  " + text.slice(position);
-                if (contentRef.current) {
-                  contentRef.current.textContent = newText;
+          <div className="block-content code-block-shell" onClick={handleClick}>
+            <div className="code-toolbar">
+              <div className="code-language-list">
+                {CODE_LANGUAGES.map((language) => (
+                  <button
+                    key={language.id}
+                    type="button"
+                    className={`code-language-btn ${selectedLanguage === language.id ? "active" : ""}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      if (!readOnly) {
+                        onContentChange(block.id, { language: language.id });
+                      }
+                    }}
+                    disabled={readOnly}
+                  >
+                    {language.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className={`code-copy-btn ${codeCopied ? "copied" : ""}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleCopyCode}
+                title="Copy code"
+              >
+                {codeCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
+
+            <pre
+              ref={contentRef}
+              contentEditable={!readOnly}
+              suppressContentEditableWarning
+              className="block-content code code-editor"
+              data-language={selectedLanguage}
+              spellCheck="false"
+              data-placeholder="Write code or paste snippet..."
+              onKeyDown={(e) => {
+                if (e.key === "Tab") {
+                  e.preventDefault();
+                  const position = getCursorPosition(contentRef.current);
+                  const text = getBlockText(contentRef.current);
+                  const newText = text.slice(0, position) + "  " + text.slice(position);
+                  if (contentRef.current) {
+                    contentRef.current.textContent = newText;
+                  }
+                  onContentChange(block.id, {
+                    ...block.content,
+                    text: newText,
+                    html: contentRef.current?.innerHTML ?? newText,
+                  });
+                  setCursorPosition(contentRef.current, position + 2);
+                  return;
                 }
-                onContentChange(block.id, {
-                  text: newText,
-                  html: contentRef.current?.innerHTML ?? newText,
-                });
-                // Restore cursor after the 2 spaces we inserted
-                setCursorPosition(contentRef.current, position + 2);
-              } else {
-                handleKeyDown(e as any);
-              }
-            }}
-            onInput={handleInput}
-            onBlur={handleBlur}
-            onClick={handleClick}
-          />
+
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const position = getCursorPosition(contentRef.current);
+                  const text = getBlockText(contentRef.current);
+                  const newText = `${text.slice(0, position)}\n${text.slice(position)}`;
+                  if (contentRef.current) {
+                    contentRef.current.textContent = newText;
+                  }
+                  onContentChange(block.id, {
+                    ...block.content,
+                    text: newText,
+                    html: contentRef.current?.innerHTML ?? newText,
+                  });
+                  setCursorPosition(contentRef.current, position + 1);
+                } else {
+                  handleKeyDown(e as any);
+                }
+              }}
+              onInput={handleInput}
+              onBlur={handleBlur}
+              onClick={handleClick}
+            />
+          </div>
         );
+      }
 
       case "divider":
         return <hr className="block-content divider" />;
 
-      case "image":
+      case "image": {
+        const rawImageUrl = ((block.content.url as string) ?? "").trim();
+        const showInput = showImageUrlInput || !rawImageUrl || Boolean(imageLoadError);
+
         return (
           <div className="block-content image-block">
-            <input
-              type="text"
-              placeholder="Enter image URL..."
-              value={(block.content.url as string) ?? ""}
-              onChange={(e) => {
-                onContentChange(block.id, { url: e.target.value });
-              }}
-              onClick={handleClick}
-            />
-            {(block.content.url as string) && (
-              <img src={block.content.url as string} alt="Block image" className="block-image" />
+            {showInput && (
+              <div className="image-link-input-wrap">
+                <input
+                  type="text"
+                  placeholder="Paste image URL..."
+                  value={rawImageUrl}
+                  readOnly={readOnly}
+                  onChange={(e) => {
+                    if (readOnly) return;
+                    const nextUrl = e.target.value.trim();
+                    onContentChange(block.id, { url: nextUrl });
+                    if (nextUrl.length === 0 || isValidImageUrl(nextUrl)) {
+                      setImageLoadError(null);
+                    } else {
+                      setImageLoadError("Use a valid http/https image link.");
+                    }
+                  }}
+                  onBlur={() => {
+                    if (rawImageUrl && isValidImageUrl(rawImageUrl) && !imageLoadError) {
+                      setShowImageUrlInput(false);
+                    }
+                  }}
+                  onClick={handleClick}
+                />
+                {imageLoadError && <p className="image-link-error">{imageLoadError}</p>}
+              </div>
+            )}
+
+            {rawImageUrl && (
+              <div className="image-preview-wrap">
+                <img
+                  src={rawImageUrl}
+                  alt="Block image"
+                  className="block-image"
+                  onLoad={() => {
+                    setImageLoadError(null);
+                    setShowImageUrlInput(false);
+                  }}
+                  onError={() => {
+                    setImageLoadError("Image could not be loaded. Try another direct image URL.");
+                    setShowImageUrlInput(true);
+                  }}
+                />
+
+                {!showInput && (
+                  <button
+                    type="button"
+                    className="image-link-edit-btn"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setShowImageUrlInput(true)}
+                    disabled={readOnly}
+                  >
+                    Change link
+                  </button>
+                )}
+              </div>
             )}
           </div>
         );
+      }
 
       case "todo":
         return (
@@ -392,14 +643,16 @@ export const Block: React.FC<BlockProps> = ({
             <input
               type="checkbox"
               checked={(block.content.checked as boolean) ?? false}
+              disabled={readOnly}
               onChange={(e) => {
+                if (readOnly) return;
                 onContentChange(block.id, { checked: e.target.checked });
               }}
               className="todo-checkbox"
             />
             <div
               ref={contentRef}
-              contentEditable
+              contentEditable={!readOnly}
               suppressContentEditableWarning
               className="todo-text"
               data-placeholder="To-do"
@@ -413,7 +666,7 @@ export const Block: React.FC<BlockProps> = ({
         return (
           <p
             ref={contentRef}
-            contentEditable
+            contentEditable={!readOnly}
             suppressContentEditableWarning
             className="block-content paragraph"
             data-placeholder="Type '/' for commands"
@@ -424,30 +677,43 @@ export const Block: React.FC<BlockProps> = ({
   };
 
   return (
-    <div className={`block ${block.type} ${isSelected ? "selected" : ""}`} data-block-id={block.id}>
-      <div className="block-controls">
-        <button
-          type="button"
-          className="block-control-btn"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onSlash(block.id)}
-          title="Open slash commands"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          className="block-control-btn block-control-btn-danger"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onDelete(block.id)}
-          title="Delete block"
-        >
-          Del
-        </button>
-      </div>
+    <div
+      className={`block ${block.type} ${isSelected ? "selected" : ""} ${isMultiSelected ? "multi-selected" : ""} ${isBeingDragged ? "being-dragged" : ""}`}
+      data-block-id={block.id}
+    >
+      {!readOnly ? (
+        <>
+          <button
+            type="button"
+            className="block-drag-trigger block-drag-trigger-left"
+            draggable
+            onDragStart={handleBlockDragStart}
+            onDragEnd={handleBlockDragEnd}
+            onClick={() => onSelect(block.id)}
+            aria-label="Drag block to delete"
+            title="Drag block"
+          >
+            :::
+          </button>
+
+          <div className="block-hover-controls">
+          <button
+            type="button"
+            className="block-add-trigger"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={handleAddBlock}
+            aria-label="Add a block below"
+            title="Add block"
+          >
+            +
+          </button>
+          </div>
+        </>
+      ) : null}
+
       <div className="block-main">{renderBlock()}</div>
 
-      {toolbarState.visible && (
+      {!readOnly && toolbarState.visible && (
         <div
           className="inline-toolbar"
           style={{ top: toolbarState.top, left: toolbarState.left }}
@@ -458,6 +724,16 @@ export const Block: React.FC<BlockProps> = ({
           </button>
           <button type="button" onClick={() => wrapSelectionInTag("em", "italic")} title="Italic (Ctrl/Cmd+I)">
             I
+          </button>
+          <button type="button" onClick={() => wrapSelectionInTag("u", "underline")} title="Underline (Ctrl/Cmd+U)">
+            U
+          </button>
+          <button
+            type="button"
+            onClick={() => wrapSelectionInTag("s", "strike")}
+            title="Strikethrough (Ctrl/Cmd+Shift+X)"
+          >
+            S
           </button>
           <button type="button" onClick={() => wrapSelectionInTag("code", "code")} title="Code (Ctrl/Cmd+E)">
             {"</>"}
