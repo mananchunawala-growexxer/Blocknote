@@ -5,8 +5,8 @@ import {
   type DocumentDetailResponse,
   type DocumentListResponse,
   updateDocumentSchema,
-  updateDocumentShareSchema,
 } from "@blocknote/shared";
+import { z } from "zod";
 import { DEFAULT_DOCUMENT_TITLE, INITIAL_BLOCK_ORDER_INDEX } from "../../constants/documents.js";
 import { pool } from "../../lib/db.js";
 import { ApiError } from "../../lib/api-error.js";
@@ -22,6 +22,10 @@ import {
   updateDocumentShareSettings,
   updateDocumentTitle,
 } from "./documents.repository.js";
+
+const updateDocumentShareSchemaLocal = z.object({
+  isPublic: z.boolean(),
+});
 
 function mapDocumentSummary(document: {
   id: string;
@@ -172,7 +176,7 @@ export async function updateDocumentShareForUser(
   documentId: string,
   input: { isPublic: boolean },
 ): Promise<DocumentShareResponse> {
-  const parsed = updateDocumentShareSchema.parse(input);
+  const parsed = updateDocumentShareSchemaLocal.parse(input);
   const shareToken = parsed.isPublic ? generateToken() : null;
   const document = await updateDocumentShareSettings(documentId, userId, {
     isPublic: parsed.isPublic,
