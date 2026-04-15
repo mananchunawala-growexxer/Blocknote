@@ -80,7 +80,9 @@ export const EditorPage: React.FC = () => {
     return <div>Document not found</div>;
   }
 
-  const isOwner = document.viewerRole === "owner";
+  // Some deployments can briefly return detail payloads without viewerRole after re-auth.
+  // Treat authenticated non-shared document routes as owner mode by default.
+  const isOwner = isSharedView ? false : Boolean(accessToken) && document.viewerRole !== "shared_reader";
   const shareUrl = document.shareUrl ? new URL(document.shareUrl, window.location.origin).toString() : null;
 
   return (
