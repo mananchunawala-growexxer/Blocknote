@@ -28,7 +28,7 @@ interface BlockProps {
   onVerticalNavigate?: (blockId: string, direction: "up" | "down", cursorPosition: number) => void;
   onDuplicate?: (blockId: string) => void;
   onTab?: (blockId: string, shiftKey: boolean) => void;
-  onSlash: (blockId: string) => void;
+  onSlash: (blockId: string, caretPosition?: { top: number; left: number; bottom: number }) => void;
   onAddAfter?: (blockId: string) => void;
   onDragStart?: (blockId: string, event: React.DragEvent<HTMLElement>) => void;
   onDragEnd?: (event: React.DragEvent<HTMLElement>) => void;
@@ -394,7 +394,21 @@ export const Block: React.FC<BlockProps> = ({
       // Allow slash menu if block is empty or nearly empty
       if (text.length === 0 || text === "/") {
         e.preventDefault();
-        onSlash(block.id);
+        const selection = window.getSelection();
+        let caretPosition: { top: number; left: number; bottom: number } | undefined;
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0).cloneRange();
+          range.collapse(true);
+          const rect = range.getClientRects()[0] ?? range.getBoundingClientRect();
+          if (rect && (rect.width > 0 || rect.height > 0 || rect.top > 0 || rect.left > 0)) {
+            caretPosition = {
+              top: rect.top,
+              left: rect.left,
+              bottom: rect.bottom,
+            };
+          }
+        }
+        onSlash(block.id, caretPosition);
       }
       return;
     }
@@ -683,6 +697,11 @@ export const Block: React.FC<BlockProps> = ({
     >
       {!readOnly ? (
         <>
+          {isSelected ? (
+            <span className="block-selection-arrow" aria-hidden="true">
+              →
+            </span>
+          ) : null}
           <button
             type="button"
             className="block-drag-trigger block-drag-trigger-left"

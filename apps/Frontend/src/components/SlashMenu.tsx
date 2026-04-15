@@ -28,6 +28,7 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ blockId, position, onSelec
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Array<HTMLLIElement | null>>([]);
 
   // Filter items based on query
   const filteredItems = BLOCK_MENU_ITEMS.filter(
@@ -97,6 +98,13 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ blockId, position, onSelec
     }
   }, [filteredItems, query]);
 
+  useEffect(() => {
+    const selectedItem = itemRefs.current[selectedIndex];
+    if (selectedItem) {
+      selectedItem.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedIndex]);
+
   return (
     <div
       ref={menuRef}
@@ -118,8 +126,12 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ blockId, position, onSelec
           {filteredItems.map((item, index) => (
             <li
               key={item.type}
+              ref={(element) => {
+                itemRefs.current[index] = element;
+              }}
               className={`slash-menu-item ${index === selectedIndex ? "selected" : ""}`}
               onClick={() => onSelectType(item.type)}
+              onMouseEnter={() => setSelectedIndex(index)}
             >
               <span className="slash-menu-item-icon" aria-hidden="true">
                 {item.icon}

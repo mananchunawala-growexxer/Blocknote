@@ -66,6 +66,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api"
 const NORMALIZED_API_BASE_URL = API_BASE_URL.endsWith("/api")
   ? API_BASE_URL
   : `${API_BASE_URL.replace(/\/+$/, "")}/api`;
+let refreshSessionPromise: Promise<boolean> | null = null;
 
 class ApiRequestError extends Error {
   constructor(
@@ -77,7 +78,62 @@ class ApiRequestError extends Error {
   }
 }
 
+function shouldAttemptRefresh(path: string): boolean {
+  return !path.startsWith("/auth/login")
+    && !path.startsWith("/auth/register")
+    && !path.startsWith("/auth/refresh")
+    && !path.startsWith("/auth/logout");
+}
+
+async function refreshSessionIfPossible(): Promise<boolean> {
+  if (refreshSessionPromise) {
+    return refreshSessionPromise;
+  }
+
+  const refreshToken = sessionStore.getSnapshot().refreshToken;
+  if (!refreshToken) {
+    sessionStore.clear();
+    return false;
+  }
+
+  refreshSessionPromise = (async () => {
+    try {
+      const response = await fetch(`${NORMALIZED_API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        sessionStore.clear();
+        return false;
+      }
+
+      const data = (await response.json()) as AuthResponse;
+      sessionStore.setSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        user: data.user,
+      });
+      return true;
+    } catch {
+      sessionStore.clear();
+      return false;
+    } finally {
+      refreshSessionPromise = null;
+    }
+  })();
+
+  return refreshSessionPromise;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return requestWithRetry<T>(path, init, true);
+}
+
+async function requestWithRetry<T>(path: string, init: RequestInit, canRetryOnAuthError: boolean): Promise<T> {
   const accessToken = sessionStore.getSnapshot().accessToken;
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
@@ -94,6 +150,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     });
   } catch {
     throw new ApiRequestError("Network error. Please verify API URL and CORS configuration.");
+  }
+
+  if (response.status === 401) {
+    if (canRetryOnAuthError && shouldAttemptRefresh(path)) {
+      const refreshed = await refreshSessionIfPossible();
+      if (refreshed) {
+        return requestWithRetry<T>(path, init, false);
+      }
+    } else {
+      sessionStore.clear();
+    }
   }
 
   if (!response.ok) {

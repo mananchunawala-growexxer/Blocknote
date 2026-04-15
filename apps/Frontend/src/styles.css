@@ -699,19 +699,26 @@ button:disabled {
 .brand-lockup {
   display: inline-flex;
   align-items: center;
-  max-width: 220px;
+  line-height: 0;
 }
 
 .brand-lockup.compact {
-  max-width: 150px;
+  max-width: none;
 }
 
 .brand-logo-image {
   display: block;
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-  border-radius: 12px;
+  width: auto;
+  height: 52px;
+  max-width: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 0;
+  background: transparent;
+}
+
+.brand-lockup.compact .brand-logo-image {
+  height: 36px;
 }
 
 .workspace-user {
@@ -1336,6 +1343,20 @@ button:disabled {
   gap: 8px;
 }
 
+.block-selection-arrow {
+  position: absolute;
+  left: -30px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  animation: blinkArrow 0.95s ease-in-out infinite;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
 .block:hover {
   background: var(--brand-soft);
 }
@@ -1366,6 +1387,7 @@ button:disabled {
   background: color-mix(in srgb, var(--accent-soft) 92%, var(--surface) 8%);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
+
 
 .block-hover-controls {
   position: absolute;
@@ -1859,6 +1881,20 @@ button:disabled {
   }
 }
 
+@keyframes blinkArrow {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-50%) translateX(2px);
+  }
+}
+
+
 /* ---------------- MENUS ---------------- */
 
 .slash-menu {
@@ -1869,56 +1905,74 @@ button:disabled {
   border-radius: 14px;
   box-shadow: var(--floating-shadow);
   z-index: 1000;
-  min-width: min(720px, calc(100vw - 28px));
-  max-width: min(720px, calc(100vw - 28px));
-  max-height: 180px;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 24px));
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 10px;
 }
 
 .slash-menu-header {
-  padding: 7px 10px;
-  border: 1px solid var(--line);
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
   color: var(--accent);
-  background: var(--brand-soft);
-  white-space: nowrap;
+  background: color-mix(in srgb, var(--brand-soft) 70%, var(--surface));
+  width: fit-content;
 }
 
 .slash-menu-items {
   list-style: none;
   margin: 0;
-  padding: 0;
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  flex-wrap: wrap;
+  padding: 2px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
   overflow-y: auto;
+  max-height: 260px;
+}
+
+.slash-menu-items::-webkit-scrollbar {
+  width: 8px;
+}
+
+.slash-menu-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.slash-menu-items::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 36%, var(--line));
+}
+
+.slash-menu-items::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 58%, var(--line));
 }
 
 .slash-menu-item {
-  padding: 8px 10px;
+  padding: 10px 11px;
   cursor: pointer;
-  transition: background-color 0.12s, border-color 0.12s, transform 0.12s;
+  transition: background-color 0.14s, border-color 0.14s, transform 0.14s;
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
   border-radius: 11px;
-  min-width: 150px;
-  background: color-mix(in srgb, var(--surface) 78%, var(--brand-soft));
+  background: color-mix(in srgb, var(--surface) 88%, var(--brand-soft));
 }
 
 .slash-menu-item:hover,
 .slash-menu-item.selected {
-  background: color-mix(in srgb, var(--accent-soft) 75%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 36%, var(--line));
+  background: linear-gradient(180deg,
+      color-mix(in srgb, var(--accent-soft) 78%, var(--surface)) 0%,
+      color-mix(in srgb, var(--accent-soft) 56%, var(--surface)) 100%);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
   transform: translateY(-1px);
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--accent-soft) 62%, transparent);
 }
 
 .slash-menu-item-icon {
@@ -1948,9 +2002,6 @@ button:disabled {
 .slash-menu-item-description {
   font-size: 11px;
   color: var(--text-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .slash-menu-empty {
@@ -1961,11 +2012,11 @@ button:disabled {
 }
 
 .slash-menu-footer {
-  padding: 7px 2px 4px;
+  padding: 4px 2px 0;
   font-size: 11px;
   color: var(--text-soft);
-  margin-left: auto;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: right;
 }
 
 .hint {
@@ -2152,20 +2203,18 @@ button:disabled {
   }
 
   .slash-menu {
-    min-width: calc(100vw - 20px);
-    max-width: calc(100vw - 20px);
-    max-height: 250px;
+    width: calc(100vw - 20px);
+    max-height: min(320px, calc(100vh - 20px));
     left: 10px !important;
     right: 10px !important;
   }
 
   .slash-menu-items {
-    gap: 6px;
+    gap: 5px;
   }
 
   .slash-menu-item {
-    min-width: 132px;
-    flex: 1 1 calc(50% - 8px);
+    min-width: 0;
   }
 
   .landing-ctas {

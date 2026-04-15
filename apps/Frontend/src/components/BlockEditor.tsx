@@ -437,10 +437,11 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
    * Handle slash command menu
    * Opens menu for block type selection
    */
-  const handleSlash = useCallback((blockId: string) => {
-    const menuWidth = Math.min(520, window.innerWidth - 28);
-    const menuHeight = Math.min(320, window.innerHeight - 28);
+  const updateSlashMenuPosition = useCallback((blockId: string) => {
+    const menuWidth = Math.min(420, window.innerWidth - 24);
+    const menuHeight = Math.min(360, Math.floor(window.innerHeight * 0.7));
     const minPadding = 12;
+    const blockElement = document.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement | null;
 
     let top = minPadding;
     let left = minPadding;
@@ -450,34 +451,60 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
       const range = selection.getRangeAt(0).cloneRange();
       range.collapse(true);
       const rangeRect = range.getClientRects()[0] ?? range.getBoundingClientRect();
-
       if (rangeRect && (rangeRect.width > 0 || rangeRect.height > 0 || rangeRect.top > 0 || rangeRect.left > 0)) {
-        top = Math.max(
-          minPadding,
-          Math.min(window.innerHeight - menuHeight - minPadding, rangeRect.bottom + 10),
-        );
-        left = Math.max(
-          minPadding,
-          Math.min(window.innerWidth - menuWidth - minPadding, rangeRect.left - 18),
-        );
+        const preferredTop = rangeRect.bottom + 8;
+        const canPlaceBelow = preferredTop + menuHeight <= window.innerHeight - minPadding;
+        top = canPlaceBelow
+          ? preferredTop
+          : Math.max(minPadding, rangeRect.top - menuHeight - 8);
+        left = rangeRect.left - 4;
       }
     }
 
-    // Fallback if selection rect is unavailable.
-    if (top === minPadding && left === minPadding) {
-      const blockElement = document.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement | null;
-      if (blockElement) {
-        const rect = blockElement.getBoundingClientRect();
-        top = Math.max(minPadding, Math.min(window.innerHeight - menuHeight - minPadding, rect.bottom + 8));
-        left = Math.max(minPadding, Math.min(window.innerWidth - menuWidth - minPadding, rect.left + 8));
-      }
+    if (blockElement && (top === minPadding && left === minPadding)) {
+      const rect = blockElement.getBoundingClientRect();
+      const preferredTop = rect.bottom + 8;
+      const canPlaceBelow = preferredTop + menuHeight <= window.innerHeight - minPadding;
+      top = canPlaceBelow
+        ? preferredTop
+        : Math.max(minPadding, rect.top - menuHeight - 8);
+      left = rect.left + 8;
     }
 
+    top = Math.max(minPadding, Math.min(window.innerHeight - menuHeight - minPadding, top));
+    left = Math.max(minPadding, Math.min(window.innerWidth - menuWidth - minPadding, left));
     setSlashMenuPosition({ top, left });
+  }, []);
 
+  const handleSlash = useCallback((blockId: string, caretPosition?: { top: number; left: number; bottom: number }) => {
+    if (caretPosition) {
+      const menuWidth = Math.min(420, window.innerWidth - 24);
+      const menuHeight = Math.min(360, Math.floor(window.innerHeight * 0.7));
+      const minPadding = 12;
+      let top = caretPosition.bottom + 8;
+      let left = caretPosition.left - 4;
+      top = Math.max(minPadding, Math.min(window.innerHeight - menuHeight - minPadding, top));
+      left = Math.max(minPadding, Math.min(window.innerWidth - menuWidth - minPadding, left));
+      setSlashMenuPosition({ top, left });
+    } else {
+      updateSlashMenuPosition(blockId);
+    }
     setSelectedBlockId(blockId);
     setSlashMenuBlockId(blockId);
-  }, []);
+  }, [updateSlashMenuPosition]);
+
+  useEffect(() => {
+    if (!slashMenuBlockId) return;
+
+    const handleViewportChange = () => updateSlashMenuPosition(slashMenuBlockId);
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [slashMenuBlockId, updateSlashMenuPosition]);
 
   const handleDeleteBlock = useCallback(
     async (blockId: string) => {
