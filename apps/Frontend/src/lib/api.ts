@@ -1,13 +1,58 @@
-import type {
-  AuthResponse,
-  DocumentShareResponse,
-  DocumentListResponse,
-  DocumentDetailResponse,
-  DocumentResponse,
-  BlockDto,
-} from "@blocknote/shared";
-import type { BlockType } from "@blocknote/shared";
 import { sessionStore } from "../stores/session";
+import type { BlockDto, BlockType } from "../types/block";
+
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+}
+
+export interface AuthResponse {
+  user: AuthenticatedUser;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface DocumentListItem {
+  id: string;
+  title: string;
+  updatedAt: string;
+  createdAt: string;
+  isPublic?: boolean;
+  shareToken?: string | null;
+  shareUrl?: string | null;
+}
+
+export interface DocumentListResponse {
+  items: DocumentListItem[];
+}
+
+export interface DocumentResponse {
+  document: DocumentListItem;
+}
+
+export interface DocumentDetailResponse {
+  document: {
+    id: string;
+    title: string;
+    updatedAt: string;
+    createdAt: string;
+    currentVersion: number;
+    isPublic: boolean;
+    shareToken: string | null;
+    shareUrl: string | null;
+    viewerRole: "owner" | "shared_reader";
+  };
+  blocks: BlockDto[];
+}
+
+export interface DocumentShareResponse {
+  document: {
+    id: string;
+    isPublic: boolean;
+    shareToken: string | null;
+    shareUrl: string | null;
+  };
+}
 
 export interface BlockListResponse {
   blocks: BlockDto[];

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import type { BlockType } from "@blocknote/shared";
+import type { BlockType } from "../types/block";
 
 interface SlashMenuProps {
   blockId: string;

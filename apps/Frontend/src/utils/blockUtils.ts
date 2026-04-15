@@ -1,4 +1,4 @@
-import type { BlockDto } from "@blocknote/shared";
+import type { BlockDto } from "../types/block";
 
 /**
  * CRITICAL: Split block at cursor position

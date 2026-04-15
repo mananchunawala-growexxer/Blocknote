@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import type { BlockDto } from "@blocknote/shared";
+import type { BlockDto } from "../types/block";
 import {
   getCursorPosition,
   setCursorPosition,

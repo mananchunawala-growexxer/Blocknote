@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { BlockDto, BlockType } from "@blocknote/shared";
+import type { BlockDto, BlockType } from "../types/block";
 import {
   getDocumentBlocks,
   createBlock,
