@@ -1,6 +1,7 @@
 import type {
   AuthResponse,
   DocumentListResponse,
+  DocumentDetailResponse,
   DocumentResponse,
   BlockDto,
 } from "@blocknote/shared";
@@ -16,6 +17,19 @@ export interface BlockResponse {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
+const NORMALIZED_API_BASE_URL = API_BASE_URL.endsWith("/api")
+  ? API_BASE_URL
+  : `${API_BASE_URL.replace(/\/+$/, "")}/api`;
+
+class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const accessToken = sessionStore.getSnapshot().accessToken;
@@ -26,14 +40,30 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${NORMALIZED_API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch {
+    throw new ApiRequestError("Network error. Please verify API URL and CORS configuration.");
+  }
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => null);
-    throw new Error(errorBody?.message ?? "Request failed");
+    const responseText = await response.text().catch(() => "");
+    let errorMessage = "Request failed";
+
+    if (responseText) {
+      try {
+        const parsed = JSON.parse(responseText) as { message?: string };
+        errorMessage = parsed.message ?? errorMessage;
+      } catch {
+        errorMessage = responseText.slice(0, 200);
+      }
+    }
+
+    throw new ApiRequestError(errorMessage, response.status);
   }
 
   if (response.status === 204) {
@@ -84,7 +114,16 @@ export async function deleteDocument(id: string) {
 // ==================== BLOCK ENDPOINTS ====================
 
 export async function getDocumentBlocks(documentId: string): Promise<BlockListResponse> {
-  return request<BlockListResponse>(`/blocks/documents/${documentId}/blocks`);
+  try {
+    return await request<BlockListResponse>(`/blocks/documents/${documentId}/blocks`);
+  } catch (error) {
+    // Backward-compatible fallback for deployments where block routes are unavailable.
+    if (error instanceof ApiRequestError && error.status === 404) {
+      const documentDetail = await request<DocumentDetailResponse>(`/documents/${documentId}`);
+      return { blocks: documentDetail.blocks };
+    }
+    throw error;
+  }
 }
 
 export async function createBlock(input: {
