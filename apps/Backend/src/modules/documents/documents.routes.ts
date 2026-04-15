@@ -20,4 +20,5 @@ documentsRouter.get("/:id", getDocumentController);
 documentsRouter.patch("/:id", renameDocumentController);
 documentsRouter.patch("/:id/share", updateDocumentShareController);
 documentsRouter.post("/:id/share", updateDocumentShareController);
+documentsRouter.put("/:id/share", updateDocumentShareController);
 documentsRouter.delete("/:id", deleteDocumentController);

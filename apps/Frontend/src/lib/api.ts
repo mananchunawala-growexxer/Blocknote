@@ -169,21 +169,26 @@ export async function updateDocumentShare(input: { id: string; isPublic: boolean
   const path = `/documents/${input.id}/share`;
   const body = JSON.stringify({ isPublic: input.isPublic });
 
-  try {
-    return await request<DocumentShareResponse>(path, {
-      method: "PATCH",
-      body,
-    });
-  } catch (error) {
-    // Backward-compatible fallback for deployments that do not expose PATCH.
-    if (error instanceof ApiRequestError && (error.status === 404 || error.status === 405)) {
-      return request<DocumentShareResponse>(path, {
-        method: "POST",
+  const methods: Array<"PATCH" | "POST" | "PUT"> = ["PATCH", "POST", "PUT"];
+  let lastError: unknown = null;
+
+  for (const method of methods) {
+    try {
+      return await request<DocumentShareResponse>(path, {
+        method,
         body,
       });
+    } catch (error) {
+      lastError = error;
+      // Only continue fallback attempts when route/method does not exist.
+      if (error instanceof ApiRequestError && (error.status === 404 || error.status === 405)) {
+        continue;
+      }
+      throw error;
     }
-    throw error;
   }
+
+  throw lastError ?? new ApiRequestError("Share endpoint is not available on the deployed backend.");
 }
 
 // ==================== BLOCK ENDPOINTS ====================
