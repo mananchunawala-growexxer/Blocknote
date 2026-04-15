@@ -166,10 +166,24 @@ export async function getSharedDocumentDetail(shareToken: string): Promise<Docum
 }
 
 export async function updateDocumentShare(input: { id: string; isPublic: boolean }): Promise<DocumentShareResponse> {
-  return request<DocumentShareResponse>(`/documents/${input.id}/share`, {
-    method: "PATCH",
-    body: JSON.stringify({ isPublic: input.isPublic }),
-  });
+  const path = `/documents/${input.id}/share`;
+  const body = JSON.stringify({ isPublic: input.isPublic });
+
+  try {
+    return await request<DocumentShareResponse>(path, {
+      method: "PATCH",
+      body,
+    });
+  } catch (error) {
+    // Backward-compatible fallback for deployments that do not expose PATCH.
+    if (error instanceof ApiRequestError && (error.status === 404 || error.status === 405)) {
+      return request<DocumentShareResponse>(path, {
+        method: "POST",
+        body,
+      });
+    }
+    throw error;
+  }
 }
 
 // ==================== BLOCK ENDPOINTS ====================
