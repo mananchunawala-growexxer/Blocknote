@@ -1103,6 +1103,11 @@ button:disabled {
   font-size: 12px;
 }
 
+.share-error-text {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
 .editor-header h1 {
   margin: 6px 0 0;
   font-size: clamp(24px, 2.8vw, 34px);

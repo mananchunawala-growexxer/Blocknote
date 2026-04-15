@@ -24,6 +24,7 @@ export function DashboardPage() {
   const [draftTitle, setDraftTitle] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [shareFeedback, setShareFeedback] = useState<Record<string, string>>({});
+  const [shareErrors, setShareErrors] = useState<Record<string, string>>({});
   const [draggedDocumentId, setDraggedDocumentId] = useState<string | null>(null);
   const [dropTargetDocumentId, setDropTargetDocumentId] = useState<string | null>(null);
   const [isDocumentDeleteZoneHovered, setIsDocumentDeleteZoneHovered] = useState(false);
@@ -60,6 +61,11 @@ export function DashboardPage() {
   const shareMutation = useMutation({
     mutationFn: updateDocumentShare,
     onSuccess: async (response, variables) => {
+      setShareErrors((current) => {
+        const next = { ...current };
+        delete next[variables.id];
+        return next;
+      });
       if (response.document.shareUrl) {
         const absoluteUrl = new URL(response.document.shareUrl, window.location.origin).toString();
         try {
@@ -78,6 +84,12 @@ export function DashboardPage() {
         }));
       }
       await queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+    onError: (error: Error, variables) => {
+      setShareErrors((current) => ({
+        ...current,
+        [variables.id]: error.message || "Unable to update share settings right now.",
+      }));
     },
   });
 
@@ -307,6 +319,7 @@ export function DashboardPage() {
                       </strong>
                       <p>Updated {formatDate(document.updatedAt)}</p>
                       {shareFeedback[document.id] ? <p className="share-feedback">{shareFeedback[document.id]}</p> : null}
+                      {shareErrors[document.id] ? <p className="error-text share-error-text">{shareErrors[document.id]}</p> : null}
                     </div>
                   )}
                 </div>

@@ -17,6 +17,7 @@ export const EditorPage: React.FC = () => {
   const isSharedView = Boolean(shareToken);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
+  const [shareErrorMessage, setShareErrorMessage] = useState<string | null>(null);
 
   const documentsQuery = useQuery({
     queryKey: ["documents"],
@@ -33,6 +34,7 @@ export const EditorPage: React.FC = () => {
   const shareMutation = useMutation({
     mutationFn: updateDocumentShare,
     onSuccess: async (response) => {
+      setShareErrorMessage(null);
       if (response.document.shareUrl) {
         try {
           await navigator.clipboard.writeText(new URL(response.document.shareUrl, window.location.origin).toString());
@@ -44,6 +46,9 @@ export const EditorPage: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
         queryClient.invalidateQueries({ queryKey: ["document", documentId] }),
       ]);
+    },
+    onError: (error: Error) => {
+      setShareErrorMessage(error.message || "Unable to update share settings right now.");
     },
   });
 
@@ -194,6 +199,7 @@ export const EditorPage: React.FC = () => {
 
         <div className="editor-content">
           {shareUrl && isOwner ? <p className="share-banner">Anyone with the share link can read this document, but cannot edit it.</p> : null}
+          {shareErrorMessage ? <p className="error-text share-error-text">{shareErrorMessage}</p> : null}
           <BlockEditor
             documentId={document.id}
             initialBlocks={documentDetailQuery.data?.blocks ?? []}
