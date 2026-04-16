@@ -203,10 +203,19 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
         setEmptyStateMessage(null);
         setSelectedBlockId(newBlockId);
         setTimeout(() => {
-          const element = document.querySelector(`[data-block-id="${newBlockId}"]`) as HTMLElement;
-          if (element) {
-            setCursorPosition(element, 0);
-            element.focus();
+          const blockElement = document.querySelector(`[data-block-id="${newBlockId}"]`) as HTMLElement | null;
+          const editable = blockElement?.querySelector("[contenteditable='true']") as HTMLElement | null;
+          const input = blockElement?.querySelector("input[type='text']") as HTMLInputElement | null;
+
+          if (editable) {
+            editable.focus();
+            setCursorPosition(editable, 0);
+            return;
+          }
+
+          if (input) {
+            input.focus();
+            input.setSelectionRange(0, 0);
           }
         }, 100);
         return;
@@ -226,10 +235,19 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
         setEmptyStateMessage(null);
         setSelectedBlockId(newBlockId);
         setTimeout(() => {
-          const element = document.querySelector(`[data-block-id="${newBlockId}"]`) as HTMLElement;
-          if (element) {
-            setCursorPosition(element, 0);
-            element.focus();
+          const blockElement = document.querySelector(`[data-block-id="${newBlockId}"]`) as HTMLElement | null;
+          const editable = blockElement?.querySelector("[contenteditable='true']") as HTMLElement | null;
+          const input = blockElement?.querySelector("input[type='text']") as HTMLInputElement | null;
+
+          if (editable) {
+            editable.focus();
+            setCursorPosition(editable, 0);
+            return;
+          }
+
+          if (input) {
+            input.focus();
+            input.setSelectionRange(0, 0);
           }
         }, 100);
 
@@ -260,10 +278,19 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
       setEmptyStateMessage(null);
       setSelectedBlockId(newBlockId);
       setTimeout(() => {
-        const element = document.querySelector(`[data-block-id="${newBlockId}"]`) as HTMLElement;
-        if (element) {
-          setCursorPosition(element, 0);
-          element.focus();
+        const blockElement = document.querySelector(`[data-block-id="${newBlockId}"]`) as HTMLElement | null;
+        const editable = blockElement?.querySelector("[contenteditable='true']") as HTMLElement | null;
+        const input = blockElement?.querySelector("input[type='text']") as HTMLInputElement | null;
+
+        if (editable) {
+          editable.focus();
+          setCursorPosition(editable, 0);
+          return;
+        }
+
+        if (input) {
+          input.focus();
+          input.setSelectionRange(0, 0);
         }
       }, 100);
     },
@@ -329,10 +356,20 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
       // Select merged block and restore cursor position
       setSelectedBlockId(previousBlock.id);
       setTimeout(() => {
-        const element = document.querySelector(`[data-block-id="${previousBlock.id}"]`) as HTMLElement;
-        if (element) {
-          setCursorPosition(element, cursorPosition);
-          element.focus();
+        const blockElement = document.querySelector(`[data-block-id="${previousBlock.id}"]`) as HTMLElement | null;
+        const editable = blockElement?.querySelector("[contenteditable='true']") as HTMLElement | null;
+        const input = blockElement?.querySelector("input[type='text']") as HTMLInputElement | null;
+
+        if (editable) {
+          editable.focus();
+          setCursorPosition(editable, cursorPosition);
+          return;
+        }
+
+        if (input) {
+          input.focus();
+          const nextPosition = Math.max(0, Math.min(cursorPosition, input.value.length));
+          input.setSelectionRange(nextPosition, nextPosition);
         }
       }, 100);
     },

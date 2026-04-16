@@ -697,11 +697,6 @@ export const Block: React.FC<BlockProps> = ({
     >
       {!readOnly ? (
         <>
-          {isSelected ? (
-            <span className="block-selection-arrow" aria-hidden="true">
-              →
-            </span>
-          ) : null}
           <button
             type="button"
             className="block-drag-trigger block-drag-trigger-left"
