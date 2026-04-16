@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BlockDto, BlockType } from "../types/block";
 import {
@@ -70,6 +70,9 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
   const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(initialSavedAt ?? null);
   const [emptyStateMessage, setEmptyStateMessage] = useState<string | null>(null);
+  const saveTimeoutsRef = useRef<Record<string, number>>({});
+  const inFlightSaveRef = useRef<Record<string, boolean>>({});
+  const queuedSaveRef = useRef<Record<string, Record<string, unknown>>>({});
 
   // Fetch blocks for document
   const blocksQuery = useQuery({
@@ -134,6 +137,50 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
     },
     onError: () => setAutosaveState("idle"),
   });
+
+  const clearScheduledSave = useCallback((blockId: string) => {
+    const timeoutId = saveTimeoutsRef.current[blockId];
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+      delete saveTimeoutsRef.current[blockId];
+    }
+  }, []);
+
+  const flushBlockSave = useCallback(
+    (blockId: string, content: Record<string, unknown>) => {
+      if (inFlightSaveRef.current[blockId]) {
+        queuedSaveRef.current[blockId] = content;
+        return;
+      }
+
+      inFlightSaveRef.current[blockId] = true;
+      markSaving();
+      updateBlockMutation.mutate(
+        {
+          blockId,
+          content,
+        },
+        {
+          onSuccess: () => {
+            markSaved();
+          },
+          onError: () => {
+            setAutosaveState("idle");
+          },
+          onSettled: () => {
+            delete inFlightSaveRef.current[blockId];
+
+            const queuedContent = queuedSaveRef.current[blockId];
+            if (queuedContent) {
+              delete queuedSaveRef.current[blockId];
+              flushBlockSave(blockId, queuedContent);
+            }
+          },
+        },
+      );
+    },
+    [markSaved, markSaving, updateBlockMutation],
+  );
 
   const deleteBlockMutation = useMutation({
     mutationFn: (blockId: string) => deleteBlock(blockId),
@@ -420,6 +467,8 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
       if (typeof nextText === "string" && block) {
         const transform = getAutoTransform(nextText, block.type);
         if (transform) {
+          clearScheduledSave(blockId);
+          delete queuedSaveRef.current[blockId];
           const transformedContent = {
             ...mergedContent,
             ...transform.content,
@@ -456,18 +505,15 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
           },
       );
 
-      // Debounced sync to backend
-      const timeout = setTimeout(() => {
-        markSaving();
-        updateBlockMutation.mutate({
-          blockId,
-          content: mergedContent,
-        });
+      // Debounced per-block save queue to avoid stale overwrites.
+      clearScheduledSave(blockId);
+      delete queuedSaveRef.current[blockId];
+      saveTimeoutsRef.current[blockId] = window.setTimeout(() => {
+        delete saveTimeoutsRef.current[blockId];
+        flushBlockSave(blockId, mergedContent);
       }, 500);
-
-      return () => clearTimeout(timeout);
     },
-    [blocks, documentId, getAutoTransform, markSaving, queryClient, queryKey, updateBlockMutation],
+    [blocks, clearScheduledSave, flushBlockSave, getAutoTransform, markSaving, queryClient, queryKey, updateBlockMutation],
   );
 
   /**
@@ -969,6 +1015,17 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleHistoryRestore, readOnly]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(saveTimeoutsRef.current).forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+      saveTimeoutsRef.current = {};
+      queuedSaveRef.current = {};
+      inFlightSaveRef.current = {};
+    };
+  }, []);
 
   // Close slash menu if selection changes (e.g. clicking away)
   useEffect(() => {

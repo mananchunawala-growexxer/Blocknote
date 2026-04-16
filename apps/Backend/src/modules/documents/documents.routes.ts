@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../../middlewares/require-auth.js";
+import { ERROR_CODES } from "@blocknote/shared";
 import {
   createDocumentController,
   deleteDocumentController,
@@ -12,7 +13,14 @@ import {
 
 export const documentsRouter = Router();
 
-documentsRouter.get("/shared/:shareToken", getSharedDocumentController);
+documentsRouter.route("/shared/:shareToken")
+  .get(getSharedDocumentController)
+  .all((_req, res) => {
+    res.status(405).json({
+      code: ERROR_CODES.VALIDATION_ERROR,
+      message: "Shared document routes are read-only. Use GET for share tokens.",
+    });
+  });
 documentsRouter.use(requireAuth);
 documentsRouter.get("/", listDocumentsController);
 documentsRouter.post("/", createDocumentController);

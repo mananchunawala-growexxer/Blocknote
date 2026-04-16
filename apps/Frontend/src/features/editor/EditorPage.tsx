@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BrandLogo } from "../../components/BrandLogo";
+import { WorkspaceHeader } from "../../components/WorkspaceHeader";
 import { getDocumentDetail, getDocuments, getSharedDocumentDetail, renameDocument, updateDocumentShare } from "../../lib/api";
 import { BlockEditor } from "../../components/BlockEditor";
 import { useSession } from "../../stores/session";
@@ -244,7 +244,6 @@ export const EditorPage: React.FC = () => {
   return (
     <main className="workspace-layout editor-shell">
       <aside className="workspace-sidebar">
-        <BrandLogo compact />
         <button className="secondary back-button" onClick={() => navigate("/")}>
           ← {isOwner ? "Documents" : "Home"}
         </button>
@@ -274,10 +273,10 @@ export const EditorPage: React.FC = () => {
       </aside>
 
       <section className="workspace-main editor-layout">
-        <header className="editor-header">
-          <div>
-            <p className="eyebrow">{isOwner ? "Editing" : "Shared document"}</p>
-            {isOwner && isEditingTitle ? (
+        <WorkspaceHeader
+          eyebrow={isOwner ? "Editing" : "Shared document"}
+          title={
+            isOwner && isEditingTitle ? (
               <form
                 className="editor-title-form"
                 onSubmit={(event) => {
@@ -311,52 +310,55 @@ export const EditorPage: React.FC = () => {
               >
                 {document.title}
               </h1>
-            )}
-          </div>
-          <div className="editor-header-actions">
-            <button
-              type="button"
-              className="secondary share-toggle-btn editor-nav-button"
-              onClick={() => navigate(isOwner ? "/" : "/auth")}
-            >
-              {isOwner ? "Dashboard" : "Login / Register"}
-            </button>
-            {isOwner ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary share-toggle-btn"
-                  onClick={() => {
-                    void handleDownloadPdf();
-                  }}
-                  disabled={isDownloadingPdf}
-                >
-                  {isDownloadingPdf ? "Preparing PDF..." : "Download PDF"}
-                </button>
-                <button
-                  type="button"
-                  className="secondary share-toggle-btn"
-                  onClick={() => shareMutation.mutate({ id: document.id, isPublic: !document.isPublic })}
-                >
-                  {document.isPublic ? "Disable share" : "Enable share"}
-                </button>
-                {shareUrl ? (
+            )
+          }
+          subtitle={isOwner ? "Shape your notes, share with readers, and export polished drafts." : "Shared access is view only, so the original document stays protected."}
+          actions={
+            <>
+              <button
+                type="button"
+                className="secondary share-toggle-btn editor-nav-button"
+                onClick={() => navigate(isOwner ? "/" : "/auth")}
+              >
+                {isOwner ? "Dashboard" : "Login / Register"}
+              </button>
+              {isOwner ? (
+                <>
                   <button
                     type="button"
                     className="secondary share-toggle-btn"
                     onClick={() => {
-                      void navigator.clipboard.writeText(shareUrl);
+                      void handleDownloadPdf();
                     }}
+                    disabled={isDownloadingPdf}
                   >
-                    Copy share link
+                    {isDownloadingPdf ? "Preparing PDF..." : "Download PDF"}
                   </button>
-                ) : null}
-              </>
-            ) : (
-              <span className="editor-header-spacer">Read only</span>
-            )}
-          </div>
-        </header>
+                  <button
+                    type="button"
+                    className="secondary share-toggle-btn"
+                    onClick={() => shareMutation.mutate({ id: document.id, isPublic: !document.isPublic })}
+                  >
+                    {document.isPublic ? "Disable share" : "Enable share"}
+                  </button>
+                  {shareUrl ? (
+                    <button
+                      type="button"
+                      className="secondary share-toggle-btn"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(shareUrl);
+                      }}
+                    >
+                      Copy share link
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <span className="editor-header-spacer">Read only</span>
+              )}
+            </>
+          }
+        />
 
         <div className="editor-content">
           {shareUrl && isOwner ? <p className="share-banner">Anyone with the share link can read this document, but cannot edit it.</p> : null}

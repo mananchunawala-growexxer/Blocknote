@@ -27,7 +27,7 @@ create table if not exists blocks (
     type in ('paragraph', 'heading_1', 'heading_2', 'todo', 'code', 'divider', 'image')
   ),
   content_json jsonb not null default '{}'::jsonb,
-  order_index numeric(20, 10) not null,
+  order_index double precision not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

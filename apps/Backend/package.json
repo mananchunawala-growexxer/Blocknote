@@ -9,6 +9,7 @@
     "migrate": "NODE_ENV=development npx tsx src/scripts/migrate.ts",
     "migrate:prod": "NODE_ENV=production npx tsx src/scripts/migrate.ts",
     "start": "node dist/server.js",
+    "test:edge": "node --import tsx --test src/__tests__/edge-cases.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BrandLogo } from "../../components/BrandLogo";
+import { WorkspaceHeader } from "../../components/WorkspaceHeader";
 import { createDocument, deleteDocument, getDocuments, renameDocument, updateDocumentShare } from "../../lib/api";
 import { sessionStore, useSession } from "../../stores/session";
 
@@ -226,7 +226,6 @@ export function DashboardPage() {
   return (
     <main className="workspace-layout">
       <aside className="workspace-sidebar">
-        <BrandLogo compact />
         <div className="workspace-user">
           <p className="eyebrow">Signed in</p>
           <p className="copy">{user?.email}</p>
@@ -259,13 +258,11 @@ export function DashboardPage() {
       </aside>
 
       <section className="workspace-main">
-        <header className="workspace-main-header">
-          <div>
-            <p className="eyebrow">Documents</p>
-            <h1>Your writing workspace</h1>
-            <p className="copy">Organize notes, drafts, and project docs in one place.</p>
-          </div>
-        </header>
+        <WorkspaceHeader
+          eyebrow="Documents"
+          title={<h1>Your writing workspace</h1>}
+          subtitle="Organize notes, drafts, and project docs in one place."
+        />
 
         <section className={`documents-panel ${draggedDocumentId ? "is-document-dragging" : ""}`}>
           {documentsQuery.isLoading ? <p>Loading documents...</p> : null}

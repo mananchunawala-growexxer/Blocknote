@@ -73,6 +73,18 @@ export const Block: React.FC<BlockProps> = ({
   const copyResetTimer = useRef<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
+  const getSelectionInsideEditable = () => {
+    if (!contentRef.current) return null;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+
+    const range = selection.getRangeAt(0);
+    if (!contentRef.current.contains(range.commonAncestorContainer)) return null;
+
+    return { selection, range };
+  };
+
   useEffect(() => {
     return () => {
       if (copyResetTimer.current !== null) {
@@ -99,8 +111,18 @@ export const Block: React.FC<BlockProps> = ({
     if (isSelected && contentRef.current) {
       // Small delay to ensure DOM is ready
       setTimeout(() => {
-        setCursorPosition(contentRef.current, savedCursorPos);
-        contentRef.current?.focus();
+        const editable = contentRef.current as HTMLElement | null;
+        if (!editable) return;
+
+        const selectionInfo = getSelectionInsideEditable();
+        if (selectionInfo && document.activeElement === editable) {
+          setSavedCursorPos(getCursorPosition(editable));
+          return;
+        }
+
+        editable.focus();
+        const nextPosition = Math.max(0, Math.min(savedCursorPos, getBlockText(editable).length));
+        setCursorPosition(editable, nextPosition);
       }, 0);
     }
   }, [isSelected, savedCursorPos, block.type]);
@@ -172,15 +194,7 @@ export const Block: React.FC<BlockProps> = ({
   };
 
   const getEditorSelectionRange = (): { selection: Selection; range: Range } | null => {
-    if (!contentRef.current) return null;
-
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return null;
-
-    const range = selection.getRangeAt(0);
-    if (!contentRef.current.contains(range.commonAncestorContainer)) return null;
-
-    return { selection, range };
+    return getSelectionInsideEditable();
   };
 
   const replaceRangeWithNode = (selection: Selection, range: Range, node: Node) => {
@@ -434,11 +448,18 @@ export const Block: React.FC<BlockProps> = ({
 
     const editable = contentRef.current as HTMLElement;
     requestAnimationFrame(() => {
+      const currentPosition = getCursorPosition(editable);
+      if (currentPosition >= 0) {
+        setSavedCursorPos(currentPosition);
+        return;
+      }
+
       if (document.activeElement !== editable) {
         editable.focus();
-        const textLength = getBlockText(editable).length;
-        setCursorPosition(editable, textLength);
       }
+
+      const fallbackPosition = Math.max(0, Math.min(savedCursorPos, getBlockText(editable).length));
+      setCursorPosition(editable, fallbackPosition);
     });
   };
 
