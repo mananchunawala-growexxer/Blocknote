@@ -7,3 +7,7 @@ export const createDocumentSchema = z.object({
 export const updateDocumentSchema = z.object({
   title: z.string().trim().min(1).max(120),
 });
+
+export const updateDocumentShareSchema = z.object({
+  isPublic: z.boolean(),
+});

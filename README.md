@@ -1,33 +1,44 @@
 # BlockNote Assignment
 
-Day 1 implementation for the BlockNote intern practical:
-- email/password auth with JWT access + refresh token rotation
-- PostgreSQL schema + SQL migrations
-- authenticated document dashboard
-- create, rename, delete, and list documents
+This repo contains a Notion-style block editor with authenticated documents, public read-only sharing, block CRUD, autosave, slash commands, drag reorder, and PostgreSQL-backed persistence.
 
-## Tech Stack
+## Stack
 
 - Frontend: React, Vite, TypeScript, TanStack Query
 - Backend: Express, TypeScript, pg, Zod, pino
 - Database: PostgreSQL
 
-## Project Structure
+## Structure
 
 ```text
 apps/
-  api/       Express API
-  web/       React frontend
+  Backend/   Express API and SQL migrations
+  Frontend/  React editor and dashboard
 packages/
-  shared/    Shared schemas, constants, and response types
+  shared/    Shared schemas, constants, and API types
 ```
 
-## Environment Setup
+## Setup
 
-1. Copy `.env.example` to `.env`
-2. Update secrets and database URL
+1. Copy `.env.example` to `.env`.
+2. Fill in the database URL and 32+ character JWT secrets.
+3. Install dependencies with `npm install`.
+4. Run migrations with `npm run migrate --workspace=@blocknote/api`.
+5. Start the backend with `npm run dev --workspace=@blocknote/api`.
+6. Start the frontend with `npm run dev --workspace=@blocknote/web`.
 
-Required variables:
+## Render Deployment
+
+For a Render backend service created from the repo root, use:
+
+- Build command: `npm run build`
+- Start command: `npm start --workspace=@blocknote/api`
+
+The root build script compiles `@blocknote/shared`, `@blocknote/api`, and `@blocknote/web`, which ensures `apps/Backend/dist/server.js` exists before Render runs the backend start command.
+
+## Required Variables
+
+- `NODE_ENV`
 - `PORT`
 - `WEB_URL`
 - `API_URL`
@@ -41,41 +52,15 @@ Required variables:
 - `CORS_ORIGIN`
 - `LOG_LEVEL`
 
-## Local Run
+## Decisions
 
-Install dependencies:
+- `order_index` uses floating-point spacing so blocks can be inserted between neighbors without renumbering the whole document.
+- Shared document routes are read-only at the API layer.
+- Ownership checks happen in document and block services before reads or writes.
+- Autosave keeps the latest per-block edit queued so older requests do not overwrite newer text.
 
-```bash
-npm install
-```
+## Known Issues
 
-Run the database migrations:
-
-```bash
-npm run migrate -w apps/api
-```
-
-Start the backend:
-
-```bash
-npm run dev -w apps/api
-```
-
-Start the frontend:
-
-```bash
-npm run dev -w apps/web
-```
-
-## Build
-
-```bash
-npm run build
-```
-
-## Notes
-
-- Document ownership is enforced in the API.
-- All SQL uses parameterized queries.
-- The Day 1 scope is intentionally limited to auth, schema, and document list flows.
-- Share links, editor behaviors, autosave, and block reordering are still pending.
+- There is no automated integration test suite yet for cross-account access or share-route method rejection.
+- `AI_LOG.md` reflects recorded work that was actually logged; it should be extended on each active work day.
+- Live deployment and repo visibility depend on the environment where this project is hosted.

@@ -1,5 +1,18 @@
 # AI Implementation Log - BlockNote Day 1 Delivery
 
+## 2026-04-16
+
+### Verification And Hardening
+- Reviewed the edge-case checklist against the current codebase and deployment docs.
+- Fixed block click caret preservation so pressing Enter after clicking inside a word splits at the clicked position instead of the block end.
+- Hardened editor autosave to debounce per block and serialize in-flight saves so older requests cannot overwrite newer content.
+- Updated the shared document route to reject non-`GET` methods with an API-level `405`.
+- Switched `blocks.order_index` to `double precision` in the base schema and added a follow-up migration for existing databases.
+- Refreshed `README.md` and `.env.example` so setup, decisions, and known limitations match the current project state.
+
+### Log Note
+- Earlier working days should be recorded explicitly when work happens; this file is not backfilled with invented history.
+
 ## 2026-04-13
 
 ### Project Overview

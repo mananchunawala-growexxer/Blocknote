@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=@blocknote/shared && npm run build --workspace=@blocknote/web",
-    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspace=@blocknote/shared && npm run build --workspace=@blocknote/api && npm run build --workspace=@blocknote/web",
+    "dev": "npm run dev --workspace=@blocknote/api & npm run dev --workspace=@blocknote/web",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "migrate": "npm run migrate --workspaces @blocknote/api"

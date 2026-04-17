@@ -20,6 +20,9 @@ export interface DocumentListItem {
   title: string;
   updatedAt: string;
   createdAt: string;
+  isPublic?: boolean;
+  shareToken?: string | null;
+  shareUrl?: string | null;
 }
 
 export interface DocumentListResponse {
@@ -49,6 +52,26 @@ export interface DocumentDetailResponse {
     createdAt: string;
     currentVersion: number;
     isPublic: boolean;
+    shareToken: string | null;
+    shareUrl: string | null;
+    viewerRole: "owner" | "shared_reader";
   };
   blocks: BlockDto[];
+}
+
+export interface DocumentShareResponse {
+  document: {
+    id: string;
+    isPublic: boolean;
+    shareToken: string | null;
+    shareUrl: string | null;
+  };
+}
+
+export interface BlockListResponse {
+  blocks: BlockDto[];
+}
+
+export interface BlockResponse {
+  block: BlockDto;
 }
