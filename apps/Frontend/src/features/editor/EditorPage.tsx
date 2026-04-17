@@ -85,6 +85,21 @@ export const EditorPage: React.FC = () => {
     return String(block.content.text ?? "").trim();
   };
 
+  const loadImageAsDataUrl = async (imageUrl: string): Promise<string> => {
+    const response = await fetch(imageUrl, { mode: "cors" });
+    if (!response.ok) {
+      throw new Error("Image fetch failed");
+    }
+
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(new Error("Image conversion failed"));
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const handleDownloadPdf = async () => {
     if (!document) return;
 
@@ -184,12 +199,49 @@ export const EditorPage: React.FC = () => {
 
         if (block.type === "image") {
           const imageUrl = text;
-          drawWrappedText(imageUrl ? `Image: ${imageUrl}` : "Image block", {
-            size: 11,
-            color: [90, 108, 131],
-            lineHeight: 16,
-          });
-          cursorY += 6;
+          if (!imageUrl) {
+            drawWrappedText("Image block", {
+              size: 11,
+              color: [90, 108, 131],
+              lineHeight: 16,
+            });
+            cursorY += 6;
+            continue;
+          }
+
+          try {
+            const imageDataUrl = imageUrl.startsWith("data:image/")
+              ? imageUrl
+              : await loadImageAsDataUrl(imageUrl);
+            const imageProps = pdf.getImageProperties(imageDataUrl);
+            const sourceWidth = Number(imageProps.width || 1);
+            const sourceHeight = Number(imageProps.height || 1);
+            const maxWidth = contentWidth;
+            const maxHeight = 320;
+            const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight, 1);
+            const renderWidth = Math.max(1, sourceWidth * scale);
+            const renderHeight = Math.max(1, sourceHeight * scale);
+
+            ensureSpace(renderHeight + 12);
+            pdf.addImage(
+              imageDataUrl,
+              String(imageProps.fileType || "JPEG"),
+              marginX,
+              cursorY,
+              renderWidth,
+              renderHeight,
+              undefined,
+              "FAST",
+            );
+            cursorY += renderHeight + 12;
+          } catch {
+            drawWrappedText(`Image: ${imageUrl}`, {
+              size: 11,
+              color: [90, 108, 131],
+              lineHeight: 16,
+            });
+            cursorY += 6;
+          }
           continue;
         }
 

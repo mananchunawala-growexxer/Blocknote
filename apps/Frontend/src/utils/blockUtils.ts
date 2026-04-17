@@ -43,7 +43,11 @@ export function splitBlock(
 
   const updatedBlock: BlockDto = {
     ...block,
-    content: { text: beforeCursor },
+    content: {
+      ...block.content,
+      text: beforeCursor,
+      html: beforeCursor,
+    },
   };
 
   const newBlock: BlockDto = {
@@ -51,7 +55,10 @@ export function splitBlock(
     documentId: block.documentId,
     parentId: null,
     type: "paragraph",
-    content: { text: afterCursor },
+    content: {
+      text: afterCursor,
+      html: afterCursor,
+    },
     orderIndex: newOrderIndex,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

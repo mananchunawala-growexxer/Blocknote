@@ -5,6 +5,8 @@ import { WorkspaceHeader } from "../../components/WorkspaceHeader";
 import { createDocument, deleteDocument, getDocuments, renameDocument, updateDocumentShare } from "../../lib/api";
 import { sessionStore, useSession } from "../../stores/session";
 
+const DOCUMENT_DRAG_MIME = "application/x-blocknote-document-id";
+
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
 }
@@ -24,7 +26,9 @@ export function DashboardPage() {
   const [draftTitle, setDraftTitle] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [shareFeedback, setShareFeedback] = useState<Record<string, string>>({});
+  const [shareLinks, setShareLinks] = useState<Record<string, string>>({});
   const [shareErrors, setShareErrors] = useState<Record<string, string>>({});
+  const [shareToast, setShareToast] = useState<{ message: string; link: string | null } | null>(null);
   const [draggedDocumentId, setDraggedDocumentId] = useState<string | null>(null);
   const [dropTargetDocumentId, setDropTargetDocumentId] = useState<string | null>(null);
   const [isDocumentDeleteZoneHovered, setIsDocumentDeleteZoneHovered] = useState(false);
@@ -73,15 +77,32 @@ export function DashboardPage() {
         } catch {
           // Ignore clipboard failures and still refresh share state.
         }
+        setShareLinks((current) => ({
+          ...current,
+          [variables.id]: absoluteUrl,
+        }));
         setShareFeedback((current) => ({
           ...current,
-          [variables.id]: "Share link copied. Viewers can read, but not edit.",
+          [variables.id]: "Share link is active and copied.",
         }));
+        setShareToast({
+          message: "Share link is ready",
+          link: absoluteUrl,
+        });
       } else {
+        setShareLinks((current) => {
+          const next = { ...current };
+          delete next[variables.id];
+          return next;
+        });
         setShareFeedback((current) => ({
           ...current,
           [variables.id]: "Sharing turned off.",
         }));
+        setShareToast({
+          message: "Sharing turned off",
+          link: null,
+        });
       }
       await queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
@@ -162,12 +183,31 @@ export function DashboardPage() {
     });
   }, [allDocuments]);
 
+  const getDraggedDocumentIdFromEvent = useCallback((event: React.DragEvent<HTMLElement>) => {
+    const dragIdFromCustomType = event.dataTransfer.getData(DOCUMENT_DRAG_MIME);
+    const dragIdFromPlainText = event.dataTransfer.getData("text/plain");
+    return dragIdFromCustomType || dragIdFromPlainText || draggedDocumentId;
+  }, [draggedDocumentId]);
+
   const handleDragStart = useCallback(
     (documentId: string, event: React.DragEvent<HTMLLIElement>) => {
       setDraggedDocumentId(documentId);
       setDropTargetDocumentId(documentId);
       event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData(DOCUMENT_DRAG_MIME, documentId);
       event.dataTransfer.setData("text/plain", documentId);
+
+      const row = event.currentTarget;
+      const preview = row.cloneNode(true) as HTMLElement;
+      preview.classList.add("doc-drag-preview");
+      preview.style.width = `${row.getBoundingClientRect().width}px`;
+      preview.style.left = "-9999px";
+      preview.style.top = "-9999px";
+      document.body.appendChild(preview);
+      event.dataTransfer.setDragImage(preview, Math.min(36, row.clientWidth / 2), 20);
+      requestAnimationFrame(() => {
+        preview.remove();
+      });
     },
     [],
   );
@@ -176,11 +216,15 @@ export function DashboardPage() {
     (targetDocumentId: string, event: React.DragEvent<HTMLLIElement>) => {
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
-      if (!draggedDocumentId || draggedDocumentId === targetDocumentId) return;
-      moveDocument(draggedDocumentId, targetDocumentId);
+      const movingDocumentId = getDraggedDocumentIdFromEvent(event);
+      if (!movingDocumentId || movingDocumentId === targetDocumentId) return;
+      if (draggedDocumentId !== movingDocumentId) {
+        setDraggedDocumentId(movingDocumentId);
+      }
+      moveDocument(movingDocumentId, targetDocumentId);
       setDropTargetDocumentId(targetDocumentId);
     },
-    [draggedDocumentId, moveDocument],
+    [draggedDocumentId, getDraggedDocumentIdFromEvent, moveDocument],
   );
 
   const handleDragLeave = useCallback(() => {
@@ -190,7 +234,7 @@ export function DashboardPage() {
   const handleDrop = useCallback(
     (targetDocumentId: string, event: React.DragEvent<HTMLLIElement>) => {
       event.preventDefault();
-      const droppedDocumentId = event.dataTransfer.getData("text/plain") || draggedDocumentId;
+      const droppedDocumentId = getDraggedDocumentIdFromEvent(event);
       if (droppedDocumentId && droppedDocumentId !== targetDocumentId) {
         moveDocument(droppedDocumentId, targetDocumentId);
       }
@@ -198,7 +242,7 @@ export function DashboardPage() {
       setDropTargetDocumentId(null);
       setIsDocumentDeleteZoneHovered(false);
     },
-    [draggedDocumentId, moveDocument],
+    [getDraggedDocumentIdFromEvent, moveDocument],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -210,18 +254,27 @@ export function DashboardPage() {
   const handleDeleteZoneDrop = useCallback(
     async (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      const droppedDocumentId = event.dataTransfer.getData("text/plain") || draggedDocumentId;
+      const droppedDocumentId = getDraggedDocumentIdFromEvent(event);
 
       if (droppedDocumentId) {
         await deleteMutation.mutateAsync(droppedDocumentId);
+        setLocalOrder((current) => (current ? current.filter((id) => id !== droppedDocumentId) : current));
       }
 
       setDraggedDocumentId(null);
       setDropTargetDocumentId(null);
       setIsDocumentDeleteZoneHovered(false);
     },
-    [deleteMutation, draggedDocumentId],
+    [deleteMutation, getDraggedDocumentIdFromEvent],
   );
+
+  useEffect(() => {
+    if (!shareToast) return;
+    const timeoutId = window.setTimeout(() => {
+      setShareToast(null);
+    }, 5600);
+    return () => window.clearTimeout(timeoutId);
+  }, [shareToast]);
 
   return (
     <main className="workspace-layout">
@@ -258,6 +311,34 @@ export function DashboardPage() {
       </aside>
 
       <section className="workspace-main">
+        {shareToast ? (
+          <div className="share-top-toast" role="status" aria-live="polite">
+            <div className="share-top-toast-content">
+              <span className="share-top-toast-text">{shareToast.message}</span>
+              {shareToast.link ? (
+                <span className="share-top-toast-link" title={shareToast.link}>
+                  {shareToast.link}
+                </span>
+              ) : null}
+            </div>
+            {shareToast.link ? (
+              <button
+                type="button"
+                className="share-top-toast-copy"
+                onClick={() => {
+                  void navigator.clipboard.writeText(shareToast.link!);
+                  setShareToast({ message: "Link copied", link: shareToast.link });
+                }}
+              >
+                Copy link
+              </button>
+            ) : null}
+            <button type="button" className="share-top-toast-close" onClick={() => setShareToast(null)} aria-label="Close toast">
+              ✕
+            </button>
+          </div>
+        ) : null}
+
         <WorkspaceHeader
           eyebrow="Documents"
           title={<h1>Your writing workspace</h1>}
@@ -272,65 +353,69 @@ export function DashboardPage() {
             <p>No documents match your search.</p>
           ) : null}
           <ul className="document-list">
-            {filteredDocuments.map((document) => (
-              <li
-                key={document.id}
-                draggable
-                onDragStart={(e) => handleDragStart(document.id, e)}
-                onDragOver={(e) => handleDragOver(document.id, e)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(document.id, e)}
-                onDragEnd={handleDragEnd}
-                className={[
-                  dropTargetDocumentId === document.id ? "doc-drop-target" : "",
-                  draggedDocumentId === document.id ? "doc-dragging" : "",
-                ].join(" ")}
-              >
-                <div className="doc-drag-handle" title="Drag to reorder">
-                  ⋮⋮
-                </div>
-                <div className="doc-item-content">
-                  {editingId === document.id ? (
-                    <form
-                      className="inline-title-form"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        renameMutation.mutate({ id: document.id, title: draftTitle });
-                      }}
-                    >
-                      <input
-                        value={draftTitle}
-                        onChange={(event) => setDraftTitle(event.target.value)}
-                        aria-label="Document title"
-                      />
-                      <button type="submit">Save</button>
-                    </form>
-                  ) : (
-                    <div>
-                      <strong
-                        className="document-title"
-                        onClick={() => navigate(`/documents/${document.id}`)}
-                        title="Click to open document"
+            {filteredDocuments.map((document) => {
+              const visibleShareUrl = shareLinks[document.id]
+                ?? (document.shareUrl ? new URL(document.shareUrl, window.location.origin).toString() : null);
+
+              return (
+                <li
+                  key={document.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(document.id, e)}
+                  onDragOver={(e) => handleDragOver(document.id, e)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(document.id, e)}
+                  onDragEnd={handleDragEnd}
+                  className={[
+                    dropTargetDocumentId === document.id ? "doc-drop-target" : "",
+                    draggedDocumentId === document.id ? "doc-dragging" : "",
+                  ].join(" ")}
+                >
+                  <div className="doc-drag-handle" title="Drag to reorder">
+                    ⋮⋮
+                  </div>
+                  <div className="doc-item-content">
+                    {editingId === document.id ? (
+                      <form
+                        className="inline-title-form"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          renameMutation.mutate({ id: document.id, title: draftTitle });
+                        }}
                       >
-                        {document.title}
-                      </strong>
-                      <p>Updated {formatDate(document.updatedAt)}</p>
-                      {shareFeedback[document.id] ? <p className="share-feedback">{shareFeedback[document.id]}</p> : null}
-                      {shareErrors[document.id] ? <p className="error-text share-error-text">{shareErrors[document.id]}</p> : null}
-                    </div>
-                  )}
-                </div>
-                <div className="document-row-actions">
-                  <button
-                    className="secondary"
-                    onClick={() => {
-                      setEditingId(document.id);
-                      setDraftTitle(document.title);
-                    }}
-                    type="button"
-                  >
-                    Rename
-                  </button>
+                        <input
+                          value={draftTitle}
+                          onChange={(event) => setDraftTitle(event.target.value)}
+                          aria-label="Document title"
+                        />
+                        <button type="submit">Save</button>
+                      </form>
+                    ) : (
+                      <div>
+                        <strong
+                          className="document-title"
+                          onClick={() => navigate(`/documents/${document.id}`)}
+                          title="Click to open document"
+                        >
+                          {document.title}
+                        </strong>
+                        <p>Updated {formatDate(document.updatedAt)}</p>
+                        {shareFeedback[document.id] ? <p className="share-feedback">{shareFeedback[document.id]}</p> : null}
+                        {shareErrors[document.id] ? <p className="error-text share-error-text">{shareErrors[document.id]}</p> : null}
+                      </div>
+                    )}
+                  </div>
+                  <div className="document-row-actions">
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        setEditingId(document.id);
+                        setDraftTitle(document.title);
+                      }}
+                      type="button"
+                    >
+                      Rename
+                    </button>
                   <button
                     className="secondary"
                     onClick={() => navigate(`/documents/${document.id}`)}
@@ -338,50 +423,48 @@ export function DashboardPage() {
                   >
                     Open
                   </button>
-                  {document.shareUrl ? (
                     <button
                       className="secondary"
+                      onClick={() => shareMutation.mutate({ id: document.id, isPublic: !document.isPublic })}
+                      type="button"
+                    >
+                      {document.isPublic ? "Disable share" : "Share"}
+                    </button>
+                    <button
+                      className="danger"
                       onClick={() => {
-                        void navigator.clipboard.writeText(new URL(document.shareUrl!, window.location.origin).toString());
+                        if (window.confirm(`Delete "${document.title}"? This action cannot be undone.`)) {
+                          deleteMutation.mutate(document.id);
+                        }
                       }}
                       type="button"
                     >
-                      Copy link
+                      Delete
                     </button>
-                  ) : null}
-                  <button
-                    className="secondary"
-                    onClick={() => shareMutation.mutate({ id: document.id, isPublic: !document.isPublic })}
-                    type="button"
-                  >
-                    {document.isPublic ? "Disable share" : "Share"}
-                  </button>
-                  <button
-                    className="danger"
-                    onClick={() => {
-                      if (window.confirm(`Delete "${document.title}"? This action cannot be undone.`)) {
-                        deleteMutation.mutate(document.id);
-                      }
-                    }}
-                    type="button"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
 
           <div
             className={`document-delete-zone ${draggedDocumentId ? "active" : ""} ${isDocumentDeleteZoneHovered ? "hovered" : ""}`}
             onDragOver={(event) => {
-              if (!draggedDocumentId) return;
+              const droppedDocumentId = getDraggedDocumentIdFromEvent(event);
+              if (!droppedDocumentId) return;
               event.preventDefault();
+              if (draggedDocumentId !== droppedDocumentId) {
+                setDraggedDocumentId(droppedDocumentId);
+              }
               setIsDocumentDeleteZoneHovered(true);
             }}
             onDragEnter={(event) => {
-              if (!draggedDocumentId) return;
+              const droppedDocumentId = getDraggedDocumentIdFromEvent(event);
+              if (!droppedDocumentId) return;
               event.preventDefault();
+              if (draggedDocumentId !== droppedDocumentId) {
+                setDraggedDocumentId(droppedDocumentId);
+              }
               setIsDocumentDeleteZoneHovered(true);
             }}
             onDragLeave={(event) => {

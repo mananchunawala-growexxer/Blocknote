@@ -37,6 +37,7 @@ const BLOCK_BAR_ITEMS: Array<{ type: BlockType; label: string; icon: string }> =
   { type: "divider", label: "Divider", icon: "—" },
   { type: "image", label: "Image", icon: "▣" },
 ];
+const BLOCK_DRAG_MIME = "application/x-blocknote-block-id";
 
 /**
  * BlockEditor manages all blocks for a document
@@ -61,6 +62,8 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
   const [slashMenuBlockId, setSlashMenuBlockId] = useState<string | null>(null);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 140, left: 140 });
   const [draggedBlockId, setDraggedBlockId] = useState<string | null>(null);
+  const [dropTargetBlockId, setDropTargetBlockId] = useState<string | null>(null);
+  const [dropTargetPosition, setDropTargetPosition] = useState<"before" | "after" | null>(null);
   const [isDeleteZoneHovered, setIsDeleteZoneHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [historyPast, setHistoryPast] = useState<BlockDto[][]>([]);
@@ -191,6 +194,26 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
     onError: () => setAutosaveState("idle"),
   });
 
+  const focusBlockStart = useCallback((blockId: string) => {
+    setSelectedBlockId(blockId);
+    setTimeout(() => {
+      const blockElement = document.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement | null;
+      const editable = blockElement?.querySelector("[contenteditable='true']") as HTMLElement | null;
+      const input = blockElement?.querySelector("input[type='text']") as HTMLInputElement | null;
+
+      if (editable) {
+        editable.focus();
+        setCursorPosition(editable, 0);
+        return;
+      }
+
+      if (input) {
+        input.focus();
+        input.setSelectionRange(0, 0);
+      }
+    }, 100);
+  }, []);
+
   /**
    * CRITICAL: Handle Enter key
    * Rule: If at end of block → create new paragraph below
@@ -204,11 +227,14 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
    */
   const handleEnter = useCallback(
     async (blockId: string, cursorPosition: number) => {
-      const block = blocks.find((b: BlockDto) => b.id === blockId);
+      const blockIndex = blocks.findIndex((b: BlockDto) => b.id === blockId);
+      if (blockIndex === -1) return;
+
+      const block = blocks[blockIndex];
       if (!block) return;
+      const nextBlock = blocks[blockIndex + 1] ?? null;
 
       const text = (block.content.text as string) ?? "";
-      const html = (block.content.html as string) ?? "";
 
       if (block.type === "todo") {
         const beforeCursor = text.slice(0, cursorPosition);
@@ -238,33 +264,22 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
 
         const response = await createBlockMutation.mutateAsync({
           documentId,
-          type: "todo",
+          type: "paragraph",
           content: {
             text: afterCursor,
             html: afterCursor,
-            checked: false,
           },
         });
 
         const newBlockId = response.block.id;
+        await reorderBlock({
+          blockId: newBlockId,
+          afterOrderIndex: block.orderIndex,
+          beforeOrderIndex: nextBlock?.orderIndex,
+        });
+        await queryClient.invalidateQueries({ queryKey });
         setEmptyStateMessage(null);
-        setSelectedBlockId(newBlockId);
-        setTimeout(() => {
-          const blockElement = document.querySelector(`[data-block-id="${newBlockId}"]`) as HTMLElement | null;
-          const editable = blockElement?.querySelector("[contenteditable='true']") as HTMLElement | null;
-          const input = blockElement?.querySelector("input[type='text']") as HTMLInputElement | null;
-
-          if (editable) {
-            editable.focus();
-            setCursorPosition(editable, 0);
-            return;
-          }
-
-          if (input) {
-            input.focus();
-            input.setSelectionRange(0, 0);
-          }
-        }, 100);
+        focusBlockStart(newBlockId);
         return;
       }
 
@@ -277,26 +292,15 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
           content: newBlock.content,
         });
 
-        // Move focus to the new block
         const newBlockId = response.block.id;
+        await reorderBlock({
+          blockId: newBlockId,
+          afterOrderIndex: block.orderIndex,
+          beforeOrderIndex: nextBlock?.orderIndex,
+        });
+        await queryClient.invalidateQueries({ queryKey });
         setEmptyStateMessage(null);
-        setSelectedBlockId(newBlockId);
-        setTimeout(() => {
-          const blockElement = document.querySelector(`[data-block-id="${newBlockId}"]`) as HTMLElement | null;
-          const editable = blockElement?.querySelector("[contenteditable='true']") as HTMLElement | null;
-          const input = blockElement?.querySelector("input[type='text']") as HTMLInputElement | null;
-
-          if (editable) {
-            editable.focus();
-            setCursorPosition(editable, 0);
-            return;
-          }
-
-          if (input) {
-            input.focus();
-            input.setSelectionRange(0, 0);
-          }
-        }, 100);
+        focusBlockStart(newBlockId);
 
         return;
       }
@@ -307,10 +311,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
       // Update current block
       await updateBlockMutation.mutateAsync({
         blockId: block.id,
-        content: {
-          ...updatedBlock.content,
-          html,
-        },
+        content: updatedBlock.content,
       });
 
       // Create new block with text after cursor
@@ -320,28 +321,17 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
         content: newBlock.content,
       });
 
-      // Move focus to the new block
       const newBlockId = response.block.id;
+      await reorderBlock({
+        blockId: newBlockId,
+        afterOrderIndex: block.orderIndex,
+        beforeOrderIndex: nextBlock?.orderIndex,
+      });
+      await queryClient.invalidateQueries({ queryKey });
       setEmptyStateMessage(null);
-      setSelectedBlockId(newBlockId);
-      setTimeout(() => {
-        const blockElement = document.querySelector(`[data-block-id="${newBlockId}"]`) as HTMLElement | null;
-        const editable = blockElement?.querySelector("[contenteditable='true']") as HTMLElement | null;
-        const input = blockElement?.querySelector("input[type='text']") as HTMLInputElement | null;
-
-        if (editable) {
-          editable.focus();
-          setCursorPosition(editable, 0);
-          return;
-        }
-
-        if (input) {
-          input.focus();
-          input.setSelectionRange(0, 0);
-        }
-      }, 100);
+      focusBlockStart(newBlockId);
     },
-    [blocks, documentId, createBlockMutation, updateBlockMutation],
+    [blocks, createBlockMutation, documentId, focusBlockStart, queryClient, queryKey, updateBlockMutation],
   );
 
   /**
@@ -545,13 +535,22 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
     }
 
     if (blockElement && (top === minPadding && left === minPadding)) {
-      const rect = blockElement.getBoundingClientRect();
-      const preferredTop = rect.bottom + 8;
+      const editable = blockElement.querySelector("[contenteditable='true']") as HTMLElement | null;
+      const input = blockElement.querySelector("input[type='text']") as HTMLInputElement | null;
+      const anchorElement = editable ?? input ?? blockElement;
+      const rect = anchorElement.getBoundingClientRect();
+      const computedStyle = window.getComputedStyle(anchorElement);
+      const parsedLineHeight = Number.parseFloat(computedStyle.lineHeight);
+      const lineHeight = Number.isFinite(parsedLineHeight)
+        ? parsedLineHeight
+        : Number.parseFloat(computedStyle.fontSize) * 1.4;
+      const lineBottom = Math.min(rect.top + lineHeight, rect.bottom);
+      const preferredTop = lineBottom + 8;
       const canPlaceBelow = preferredTop + menuHeight <= window.innerHeight - minPadding;
       top = canPlaceBelow
         ? preferredTop
         : Math.max(minPadding, rect.top - menuHeight - 8);
-      left = rect.left + 8;
+      left = rect.left + 6;
     }
 
     top = Math.max(minPadding, Math.min(window.innerHeight - menuHeight - minPadding, top));
@@ -868,6 +867,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
       setIsDragging(true);
       setSelectedBlockId(blockId);
       event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData(BLOCK_DRAG_MIME, blockId);
       event.dataTransfer.setData("text/plain", blockId);
 
       const blockElement = (event.currentTarget as HTMLElement).closest("[data-block-id]") as HTMLElement | null;
@@ -890,14 +890,93 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
 
   const handleBlockDragEnd = useCallback(() => {
     setDraggedBlockId(null);
+    setDropTargetBlockId(null);
+    setDropTargetPosition(null);
     setIsDragging(false);
     setIsDeleteZoneHovered(false);
   }, []);
 
+  const getDraggedBlockIdFromEvent = useCallback((event: React.DragEvent<HTMLElement>) => {
+    const fromCustomMime = event.dataTransfer.getData(BLOCK_DRAG_MIME);
+    const fromText = event.dataTransfer.getData("text/plain");
+    return fromCustomMime || fromText || draggedBlockId;
+  }, [draggedBlockId]);
+
+  const handleBlockDragOver = useCallback(
+    (targetBlockId: string, event: React.DragEvent<HTMLDivElement>) => {
+      const movingBlockId = getDraggedBlockIdFromEvent(event);
+      if (!movingBlockId || movingBlockId === targetBlockId) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      if (draggedBlockId !== movingBlockId) {
+        setDraggedBlockId(movingBlockId);
+      }
+      setIsDeleteZoneHovered(false);
+
+      const targetRect = event.currentTarget.getBoundingClientRect();
+      const nextPosition = event.clientY >= targetRect.top + targetRect.height / 2 ? "after" : "before";
+      setDropTargetBlockId(targetBlockId);
+      setDropTargetPosition(nextPosition);
+    },
+    [draggedBlockId, getDraggedBlockIdFromEvent],
+  );
+
+  const handleBlockDrop = useCallback(
+    async (targetBlockId: string, event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const movingBlockId = getDraggedBlockIdFromEvent(event);
+      if (!movingBlockId || movingBlockId === targetBlockId) {
+        setDropTargetBlockId(null);
+        setDropTargetPosition(null);
+        return;
+      }
+
+      const targetRect = event.currentTarget.getBoundingClientRect();
+      const placeAfterTarget = event.clientY >= targetRect.top + targetRect.height / 2;
+
+      const movingBlock = blocks.find((block) => block.id === movingBlockId);
+      if (!movingBlock) {
+        setDropTargetBlockId(null);
+        setDropTargetPosition(null);
+        return;
+      }
+
+      const withoutMoving = blocks.filter((block) => block.id !== movingBlockId);
+      const targetIndex = withoutMoving.findIndex((block) => block.id === targetBlockId);
+      if (targetIndex === -1) {
+        setDropTargetBlockId(null);
+        setDropTargetPosition(null);
+        return;
+      }
+
+      const insertIndex = placeAfterTarget ? targetIndex + 1 : targetIndex;
+      const previousBlock = insertIndex > 0 ? withoutMoving[insertIndex - 1] : null;
+      const nextBlock = insertIndex < withoutMoving.length ? withoutMoving[insertIndex] : null;
+
+      const afterOrderIndex = previousBlock?.orderIndex ?? "0";
+      const beforeOrderIndex = nextBlock?.orderIndex;
+
+      markSaving();
+      await reorderBlock({
+        blockId: movingBlockId,
+        afterOrderIndex,
+        beforeOrderIndex,
+      });
+      await queryClient.invalidateQueries({ queryKey });
+      setSelectedBlockId(movingBlockId);
+      setDraggedBlockId(null);
+      setDropTargetBlockId(null);
+      setDropTargetPosition(null);
+      setIsDragging(false);
+      setIsDeleteZoneHovered(false);
+    },
+    [blocks, getDraggedBlockIdFromEvent, markSaving, queryClient, queryKey],
+  );
+
   const handleDeleteZoneDrop = useCallback(
     async (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      const droppedBlockId = event.dataTransfer.getData("text/plain") || draggedBlockId;
+      const droppedBlockId = getDraggedBlockIdFromEvent(event);
       setIsDeleteZoneHovered(false);
 
       if (!droppedBlockId) {
@@ -908,9 +987,11 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
 
       await handleDeleteBlock(droppedBlockId);
       setDraggedBlockId(null);
+      setDropTargetBlockId(null);
+      setDropTargetPosition(null);
       setIsDragging(false);
     },
-    [draggedBlockId, handleDeleteBlock],
+    [getDraggedBlockIdFromEvent, handleDeleteBlock],
   );
 
   /**
@@ -1114,6 +1195,9 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
             onAddAfter={handleAddBlockAfter}
             onDragStart={handleBlockDragStart}
             onDragEnd={handleBlockDragEnd}
+            onDragOver={handleBlockDragOver}
+            onDrop={handleBlockDrop}
+            dragOverPosition={dropTargetBlockId === block.id ? dropTargetPosition : null}
             readOnly={readOnly}
           />
         ))}
@@ -1174,6 +1258,8 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({
           onDragLeave={(event) => {
             if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
             setIsDeleteZoneHovered(false);
+            setDropTargetBlockId(null);
+            setDropTargetPosition(null);
           }}
           onDrop={(event) => {
             void handleDeleteZoneDrop(event);

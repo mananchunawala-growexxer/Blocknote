@@ -5,6 +5,56 @@ import { BrandLogo } from "../../components/BrandLogo";
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const frameRef = React.useRef<HTMLElement>(null);
+  const headlineText = "Write faster.\nStructure better.\nPublish confidently.";
+  const [typedHeadline, setTypedHeadline] = React.useState("");
+  const [isTypingComplete, setIsTypingComplete] = React.useState(false);
+
+  React.useEffect(() => {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) {
+      setTypedHeadline(headlineText);
+      setIsTypingComplete(true);
+      return;
+    }
+
+    let index = 0;
+    let intervalId: number | null = null;
+    let restartTimeoutId: number | null = null;
+
+    const randomRestartDelay = () => Math.floor(Math.random() * 5000) + 5000; // 5000-10000ms
+
+    const runTypingCycle = () => {
+      index = 0;
+      setTypedHeadline("");
+      setIsTypingComplete(false);
+
+      intervalId = window.setInterval(() => {
+        index += 1;
+        setTypedHeadline(headlineText.slice(0, index));
+
+        if (index >= headlineText.length) {
+          if (intervalId !== null) {
+            window.clearInterval(intervalId);
+            intervalId = null;
+          }
+          setIsTypingComplete(true);
+          restartTimeoutId = window.setTimeout(runTypingCycle, randomRestartDelay());
+        }
+      }, 34);
+    };
+
+    const initialDelay = window.setTimeout(runTypingCycle, 220);
+
+    return () => {
+      window.clearTimeout(initialDelay);
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+      if (restartTimeoutId !== null) {
+        window.clearTimeout(restartTimeoutId);
+      }
+    };
+  }, []);
 
   const handleMouseMove = (event: React.MouseEvent<HTMLElement>) => {
     const frame = frameRef.current;
@@ -71,12 +121,8 @@ export const LandingPage: React.FC = () => {
           <section className="landing-hero">
             <BrandLogo />
             <p className="eyebrow motion-rise motion-delay-1">Professional document editor</p>
-            <h1 className="motion-rise motion-delay-2">
-              Write faster.
-              <br />
-              Structure better.
-              <br />
-              Publish confidently.
+            <h1 className={`motion-rise motion-delay-2 typing-headline ${isTypingComplete ? "" : "typing-active"}`}>
+              {typedHeadline}
             </h1>
             <p className="copy motion-rise motion-delay-3">
               A modern block-based editor inspired by the best writing tools, designed for polished notes, specs, and

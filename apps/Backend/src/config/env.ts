@@ -6,10 +6,26 @@ import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRootEnvPath = path.resolve(process.cwd(), ".env");
 
-if (fs.existsSync(repoRootEnvPath)) {
-  dotenv.config({ path: repoRootEnvPath });
+function findEnvPath(startDir: string): string | null {
+  let currentDir = path.resolve(startDir);
+  while (true) {
+    const candidate = path.join(currentDir, ".env");
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      return null;
+    }
+    currentDir = parentDir;
+  }
+}
+
+const discoveredEnvPath = findEnvPath(process.cwd()) ?? findEnvPath(__dirname);
+if (discoveredEnvPath) {
+  dotenv.config({ path: discoveredEnvPath });
 } else {
   dotenv.config();
 }

@@ -124,6 +124,7 @@ describe("BlockEditor", () => {
           blockId: "block-1",
           content: expect.objectContaining({
             text: "he",
+            html: "he",
           }),
         }),
       );
@@ -138,6 +139,83 @@ describe("BlockEditor", () => {
         }),
       }),
     );
+
+    expect(apiMocks.reorderBlock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blockId: "block-2",
+        afterOrderIndex: "1000.0000000000",
+      }),
+    );
+  });
+
+  it("inserts a new paragraph directly below current block at end of line", async () => {
+    const secondBlock: BlockDto = {
+      ...baseBlock,
+      id: "block-3",
+      content: { text: "world", html: "world" },
+      orderIndex: "2000.0000000000",
+    };
+
+    const { container } = renderEditor([baseBlock, secondBlock]);
+    const editable = await waitFor(() => {
+      const node = container.querySelector("[data-block-id='block-1'] [contenteditable='true']") as HTMLElement | null;
+      expect(node).not.toBeNull();
+      return node!;
+    });
+
+    editable.focus();
+    setCaretPosition(editable, 5);
+    fireEvent.keyDown(editable, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(apiMocks.createBlock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          documentId: "doc-1",
+          type: "paragraph",
+        }),
+      );
+    });
+
+    expect(apiMocks.reorderBlock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blockId: "block-2",
+        afterOrderIndex: "1000.0000000000",
+        beforeOrderIndex: "2000.0000000000",
+      }),
+    );
+  });
+
+  it("creates a paragraph when Enter is pressed inside a to-do block", async () => {
+    const todoBlock: BlockDto = {
+      ...baseBlock,
+      id: "todo-1",
+      type: "todo",
+      content: {
+        text: "task",
+        html: "task",
+        checked: false,
+      },
+    };
+
+    const { container } = renderEditor([todoBlock]);
+    const editable = await waitFor(() => {
+      const node = container.querySelector("[data-block-id='todo-1'] [contenteditable='true']") as HTMLElement | null;
+      expect(node).not.toBeNull();
+      return node!;
+    });
+
+    editable.focus();
+    setCaretPosition(editable, 4);
+    fireEvent.keyDown(editable, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(apiMocks.createBlock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          documentId: "doc-1",
+          type: "paragraph",
+        }),
+      );
+    });
   });
 
   it("queues the newest autosave while an older save is still in flight", async () => {

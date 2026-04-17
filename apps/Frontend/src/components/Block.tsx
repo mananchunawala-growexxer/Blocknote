@@ -32,6 +32,9 @@ interface BlockProps {
   onAddAfter?: (blockId: string) => void;
   onDragStart?: (blockId: string, event: React.DragEvent<HTMLElement>) => void;
   onDragEnd?: (event: React.DragEvent<HTMLElement>) => void;
+  onDragOver?: (blockId: string, event: React.DragEvent<HTMLDivElement>) => void;
+  onDrop?: (blockId: string, event: React.DragEvent<HTMLDivElement>) => void;
+  dragOverPosition?: "before" | "after" | null;
 }
 
 /**
@@ -58,6 +61,9 @@ export const Block: React.FC<BlockProps> = ({
   onAddAfter,
   onDragStart,
   onDragEnd,
+  onDragOver,
+  onDrop,
+  dragOverPosition = null,
 }) => {
   const contentRef = useRef<any>(null);
   const [savedCursorPos, setSavedCursorPos] = useState(0);
@@ -422,6 +428,20 @@ export const Block: React.FC<BlockProps> = ({
             };
           }
         }
+        if (!caretPosition && contentRef.current) {
+          const editableRect = (contentRef.current as HTMLElement).getBoundingClientRect();
+          const computedStyle = window.getComputedStyle(contentRef.current as HTMLElement);
+          const parsedLineHeight = Number.parseFloat(computedStyle.lineHeight);
+          const lineHeight = Number.isFinite(parsedLineHeight)
+            ? parsedLineHeight
+            : Number.parseFloat(computedStyle.fontSize) * 1.4;
+          const lineBottom = editableRect.top + lineHeight;
+          caretPosition = {
+            top: editableRect.top,
+            left: editableRect.left + 6,
+            bottom: Math.min(lineBottom, editableRect.bottom),
+          };
+        }
         onSlash(block.id, caretPosition);
       }
       return;
@@ -713,8 +733,10 @@ export const Block: React.FC<BlockProps> = ({
 
   return (
     <div
-      className={`block ${block.type} ${isSelected ? "selected" : ""} ${isMultiSelected ? "multi-selected" : ""} ${isBeingDragged ? "being-dragged" : ""}`}
+      className={`block ${block.type} ${isSelected ? "selected" : ""} ${isMultiSelected ? "multi-selected" : ""} ${isBeingDragged ? "being-dragged" : ""} ${dragOverPosition === "before" ? "drop-target-before" : ""} ${dragOverPosition === "after" ? "drop-target-after" : ""}`}
       data-block-id={block.id}
+      onDragOver={(event) => onDragOver?.(block.id, event)}
+      onDrop={(event) => onDrop?.(block.id, event)}
     >
       {!readOnly ? (
         <>
@@ -725,7 +747,7 @@ export const Block: React.FC<BlockProps> = ({
             onDragStart={handleBlockDragStart}
             onDragEnd={handleBlockDragEnd}
             onClick={() => onSelect(block.id)}
-            aria-label="Drag block to delete"
+            aria-label="Drag block to reorder or delete"
             title="Drag block"
           >
             :::
